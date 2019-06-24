@@ -9,12 +9,7 @@ uint64_t pow2[64] = {0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0
 
 int main(void) {
 
-	//testPerft("/home/alpha/Documents/1/C/Engine/perft/perft6.txt", 6);
-
-	testMoves(INITIAL, 6);
-
-	//listen();
-
+	listen();
 
 	return EXIT_SUCCESS;
 }

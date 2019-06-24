@@ -28,7 +28,7 @@ typedef struct {
 } History;
 
 int legalMoves(Board board, Move *moves);
-uint64_t superPieceAttacks(Board board, uint64_t kingBB, int color);
+int kingInCheck(Board board, uint64_t kingBB, int color);
 
 
 #endif /* SRC_MOVES_H_ */
