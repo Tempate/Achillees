@@ -1,10 +1,3 @@
-/*
- * moves.h
- *
- *  Created on: Jun 14, 2019
- *      Author: alpha
- */
-
 #ifndef SRC_MOVES_H_
 #define SRC_MOVES_H_
 

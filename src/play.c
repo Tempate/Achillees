@@ -13,7 +13,7 @@ long perft(Board board, const int depth) {
 	Move moves[218];
 	History history;
 
-	int k, nMoves, newDepth;
+	int k, newDepth;
 	long nodes = 0;
 
 	if (depth == 1) {
@@ -24,10 +24,7 @@ long perft(Board board, const int depth) {
 
 		for (int i = 0; i < k; i++) {
 			makeMove(&board, moves[i], &history);
-
-			nMoves = perft(board, newDepth);
-			nodes += nMoves;
-
+			nodes += perft(board, newDepth);
 			undoMove(&board, moves[i], history);
 		}
 	}
@@ -37,8 +34,11 @@ long perft(Board board, const int depth) {
 
 
 void makeMove(Board *board, Move move, History *history) {
-	const int color = move.color, opColor = 1 - color;
-	int enPassant, castle;
+	const int color = move.color, opColor = 1 ^ color;
+
+	static const int removeCastling[2] = {12, 3};
+
+	int castle;
 
 	history->castling = board->castling;
 	history->enPassant = board->enPassant;
@@ -49,11 +49,7 @@ void makeMove(Board *board, Move move, History *history) {
 
 	switch (move.piece) {
 	case PAWN:
-		// Updates the enPassant
-		enPassant = board->enPassant;
-		board->enPassant = (abs(move.to - move.from) == 16) ? move.from + 8 - 16*color : 0;
-
-		if (move.to == enPassant && enPassant) {
+		if (board->enPassant && move.to == board->enPassant) {
 			// Removes a pawn captured en passant
 			unsetBits(board, opColor, PAWN, move.to - 8 + 16*color);
 			// Move the pawn to the en passant square
@@ -67,20 +63,21 @@ void makeMove(Board *board, Move move, History *history) {
 			checkCapture(board, history, move.to, opColor);
 		}
 
+		board->enPassant = (abs(move.to - move.from) == 16) ? move.from + 8 - 16*color : 0;
 		board->fiftyMoves = 0;
 
 		break;
 	case KING:
 		// Removes castling for the kings color
-		board->castling &= 12 >> 2*color;            // WHITE: 1100   BLACK: 0011
+		board->castling &= removeCastling[color];            // WHITE: 1100   BLACK: 0011
 		board->enPassant = 0;
+		++(board->fiftyMoves);
 
 		if (move.castle != -1) {
 			castle = bitScanForward(move.castle);
 			setBits  (board, color, KING, castleLookup[castle][0]);
 			unsetBits(board, color, ROOK, castleLookup[castle][1]);
 			setBits  (board, color, ROOK, castleLookup[castle][2]);
-			++(board->fiftyMoves);
 		} else {
 			setBits(board, color, KING, move.to);
 			checkCapture(board, history, move.to, opColor);
@@ -104,7 +101,7 @@ void makeMove(Board *board, Move move, History *history) {
 }
 
 void undoMove(Board *board, Move move, History history) {
-	const int color = move.color, opColor = 1 - color;
+	const int color = move.color, opColor = 1 ^ color;
 	int castle;
 
 	board->castling = history.castling;
@@ -115,7 +112,7 @@ void undoMove(Board *board, Move move, History history) {
 
 	switch (move.piece) {
 	case PAWN:
-		if (move.to == board->enPassant && board->enPassant) {
+		if (board->enPassant && move.to == board->enPassant) {
 			// Adds the pawn captured en passant
 			setBits(board, opColor, PAWN, move.to - 8 + 16*color);
 			unsetBits(board, color, PAWN, move.to);
@@ -172,6 +169,7 @@ int findPiece(Board board, uint64_t toBB, int color) {
 		if (toBB & board.pieces[color][i])
 			return i;
 	}
+
 	return -1;
 }
 

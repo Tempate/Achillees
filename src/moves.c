@@ -63,10 +63,10 @@ static int pseudoLegalMoves(Board board, Move *moves) {
  * Returns 1 if in check and 0 otherwise
  */
 int kingInCheck(Board board, uint64_t kingBB, int color) {
-	const int opColor = 1 - color, kingIndex = bitScanForward(kingBB);
+	const int opColor = 1 ^ color, kingIndex = bitScanForward(kingBB);
 
 	const uint64_t bishopsAndQueens = board.pieces[opColor][BISHOP] | board.pieces[opColor][QUEEN];
-	const uint64_t rooksAndQueens   = board.pieces[opColor][ROOK]   | board.pieces[opColor][QUEEN];
+	const uint64_t rooksAndQueens = board.pieces[opColor][ROOK] | board.pieces[opColor][QUEEN];
 
 	if (color == WHITE) {
 		if ((noEaOne(kingBB) | noWeOne(kingBB)) & board.pieces[opColor][PAWN]) return 1;
@@ -76,6 +76,7 @@ int kingInCheck(Board board, uint64_t kingBB, int color) {
 
 	if (bishopMoves(kingIndex, board.occupied, board.players[color]) & bishopsAndQueens) return 1;
 	if (rookMoves  (kingIndex, board.occupied, board.players[color]) & rooksAndQueens) return 1;
+
 	if (knightMoves(kingIndex) & board.pieces[opColor][KNIGHT]) return 1;
 	if (kingMoves  (kingIndex) & board.pieces[opColor][KING]) return 1;
 
@@ -105,7 +106,7 @@ static inline uint64_t bCaptLeftPawn  (uint64_t bb, uint64_t opPieces) { return 
 static void pawnPseudoLegalMoves(Board board, Move *moves, int *n) {
 	const int color = board.turn;
 
-	uint64_t opPieces = board.players[1 - color];
+	uint64_t opPieces = board.players[1 ^ color];
 	uint64_t bb = board.pieces[color][PAWN];
 	uint64_t singlePush;
 
@@ -136,11 +137,11 @@ static void pawnPseudoLegalMoves(Board board, Move *moves, int *n) {
 // A possible optimization would involve making a new function for double-pushed pawns as they don't get promoted
 static void pawnMoves(Move *moves, int *n, uint64_t bb, int color, int shift) {
 	// Lookup table for promotions depending on color
-	static const uint64_t promote[2] = {0xff00000000000000, 0xff};
+	static const uint64_t promote = 0xff000000000000ff;
 	int from, to;
 
 	// Splits the bitboard into promoting pawns and non-promoting pawns
-	uint64_t promoting = bb & promote[color];
+	uint64_t promoting = bb & promote;
 	bb ^= promoting;
 
 	// Adds the moves for all non-promoting pawns

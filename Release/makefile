@@ -23,19 +23,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: Tmesis
+all: Achillees
 
 # Tool invocations
-Tmesis: $(OBJS) $(USER_OBJS)
+Achillees: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cross GCC Linker'
-	gcc  -o "Tmesis" $(OBJS) $(USER_OBJS) $(LIBS)
+	gcc  -o "Achillees" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) Tmesis
+	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) Achillees
 	-@echo ' '
 
 .PHONY: all clean dependents

@@ -4,10 +4,12 @@
 #include "main.h"
 #include "board.h"
 #include "play.h"
+#include "search.h"
 
-#define MAX_DEPTH 6
 
+#define MAX_DEPTH 5
 
+static void uci(void);
 static void isready(void);
 static void ucinewgame(Board *board);
 static void position(Board *board, char *s);
@@ -19,30 +21,24 @@ void listen(void) {
 	Board *board = malloc(sizeof(Board));
 	Settings settings;
 
-	char message[4096], *r, *part;
+	char message[4096], *r, *part, pv[6];
 	int depth, quit = 0;
 
-	/*
-	printf("id name %s\n", ENGINE_NAME);
-	printf("id author %s\n", ENGINE_AUTHOR);
-	printf("uciok\n");
-	*/
-
-	/*
 	while (1) {
 		r = fgets(message, 4096, stdin);
 		if (r == NULL) break;
 		part = message;
 
-		if (strncmp(part, "quit", 4) == 0) {
-			return;
+		if (strncmp(part, "uci", 3) == 0) {
+			uci(); break;
 		} else if (strncmp(part, "isready", 7) == 0) {
 			isready(); break;
 		} else if (strncmp(part, "ucinewgame", 10) == 0) {
-			ucinewgame(&board); break;
+			ucinewgame(board); break;
+		} else if (strncmp(part, "quit", 4) == 0) {
+			return;
 		}
 	}
-	*/
 
 	while (!quit) {
 		r = fgets(message, 4096, stdin);
@@ -60,6 +56,9 @@ void listen(void) {
 			position(board, part + 9);
 		} else if (strncmp(part, "go", 2) == 0) {
 			go(&settings, part);
+
+			moveToText(search(*board, settings), pv);
+			printf("bestmove %s\n", pv);
 		} else if (strncmp(part, "stop", 4) == 0) {
 			settings.stop = 1;
 		} else if (strncmp(part, "print", 5) == 0) {
@@ -73,6 +72,13 @@ void listen(void) {
 	}
 
 	free(board);
+}
+
+// Initial command to set UCI as the control mode
+static void uci(void) {
+	printf("id name %s\n", ENGINE_NAME);
+	printf("id author %s\n", ENGINE_AUTHOR);
+	printf("uciok\n");
 }
 
 // Lets the GUI know the engine is ready. Serves as a ping.
@@ -114,15 +120,13 @@ static void position(Board *board, char *s) {
 		}
 	}
 
-	printBoard(*board);
-
 	free(history);
 }
 
 static void go(Settings *settings, char *s) {
 	// Default values for 1+0
 	settings->stop = 0;
-	settings->depth = 0;
+	settings->depth = MAX_DEPTH;
 	settings->nodes = 0;
 	settings->mate = 0;
 	settings->wtime = 60000;

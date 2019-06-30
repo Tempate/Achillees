@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#define ENGINE_NAME "tempate"
+#define ENGINE_NAME "Achillees"
 #define ENGINE_AUTHOR "tempate"
 
 #define FILES 8
