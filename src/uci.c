@@ -5,6 +5,7 @@
 #include "board.h"
 #include "play.h"
 #include "search.h"
+#include "eval.h"
 
 
 #define MAX_DEPTH 5
@@ -14,6 +15,8 @@ static void isready(void);
 static void ucinewgame(Board *board);
 static void position(Board *board, char *s);
 static void go(Settings *settings, char *s);
+static void bestmove(Board board, Settings settings);
+static void eval_(Board board);
 static void perftUntilDepth(Board board, const int depth);
 
 
@@ -21,7 +24,7 @@ void listen(void) {
 	Board *board = malloc(sizeof(Board));
 	Settings settings;
 
-	char message[4096], *r, *part, pv[6];
+	char message[4096], *r, *part;
 	int depth, quit = 0;
 
 	while (1) {
@@ -55,10 +58,8 @@ void listen(void) {
 		} else if (strncmp(part, "position", 8) == 0) {
 			position(board, part + 9);
 		} else if (strncmp(part, "go", 2) == 0) {
-			go(&settings, part);
-
-			moveToText(search(*board, settings), pv);
-			printf("bestmove %s\n", pv);
+			go(&settings, part + 2);
+			bestmove(*board, settings);
 		} else if (strncmp(part, "stop", 4) == 0) {
 			settings.stop = 1;
 		} else if (strncmp(part, "print", 5) == 0) {
@@ -66,6 +67,8 @@ void listen(void) {
 		} else if (strncmp(part, "perft", 5) == 0) {
 			depth = atoi(part + 6);
 			perftUntilDepth(*board, depth);
+		} else if (strncmp(part, "eval", 4) == 0) {
+			eval_(*board);
 		} else if (strncmp(part, "quit", 4) == 0) {
 			quit = 1;
 		}
@@ -76,14 +79,16 @@ void listen(void) {
 
 // Initial command to set UCI as the control mode
 static void uci(void) {
-	printf("id name %s\n", ENGINE_NAME);
-	printf("id author %s\n", ENGINE_AUTHOR);
-	printf("uciok\n");
+	fprintf(stdout, "id name %s\n", ENGINE_NAME);
+	fprintf(stdout, "id author %s\n", ENGINE_AUTHOR);
+	fprintf(stdout, "uciok\n");
+	fflush(stdout);
 }
 
 // Lets the GUI know the engine is ready. Serves as a ping.
 static void isready(void) {
-	printf("readyok\n");
+	fprintf(stdout, "readyok\n");
+	fflush(stdout);
 }
 
 // Creates a brand new game
@@ -94,7 +99,7 @@ static void ucinewgame(Board *board) {
 
 /*
  * Sets the board to a certain position
- * position (startpos | fen) <fen?> (moves e2e4 c7c5)?
+ * position (startpos | fen) (moves e2e4 c7c5)?
  */
 static void position(Board *board, char *s) {
 	History *history = malloc(sizeof(History));
@@ -105,8 +110,7 @@ static void position(Board *board, char *s) {
 	if (strncmp(s, "startpos", 8) == 0) {
 		s += 9;
 		ucinewgame(board);
-	} else if (strncmp(s, "fen", 3) == 0) {
-		s += 4;
+	} else {
 		s += parseFen(board, s) + 1;
 	}
 
@@ -136,7 +140,7 @@ static void go(Settings *settings, char *s) {
 	settings->movestogo = 20;
 	settings->movetime = 0;
 
-	while (s[1] != '\0') {
+	while (s[1] != '\0' && s[1] != '\n') {
 		if (strncmp(s, "infinite", 8) == 0) {
 			settings->depth = MAX_DEPTH;
 			break;
@@ -173,6 +177,27 @@ static void go(Settings *settings, char *s) {
 	}
 }
 
+static void bestmove(Board board, Settings settings) {
+	Move move;
+	char pv[6];
+
+	move = search(board, settings);
+	moveToText(move, pv);
+
+	fprintf(stdout, "bestmove %s\n", pv);
+	fflush(stdout);
+}
+
+static void eval_(Board board) {
+	int score = eval(board);
+
+	if (board.turn == BLACK)
+		score = -score;
+
+	fprintf(stdout, "%d\n", score);
+	fflush(stdout);
+}
+
 /*
  * Runs perft from 1 to the required depth.
  */
@@ -185,8 +210,9 @@ static void perftUntilDepth(Board board, const int depth) {
 		start = clock();
 		nodes = perft(board, d);
 		duration = 1000 * (clock() - start) / CLOCKS_PER_SEC;
-		printf("info depth %d nodes %ld time %d\n", d, nodes, (int) duration);
+		fprintf(stdout, "info depth %d nodes %ld time %d\n", d, nodes, (int) duration);
 	}
 
-	printf("nodes %ld\n", nodes);
+	fprintf(stdout, "nodes %ld\n", nodes);
+	fflush(stdout);
 }
