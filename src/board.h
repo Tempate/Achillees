@@ -49,7 +49,8 @@ Move textToMove(Board board, char *text);
 int parseFen(Board *board, char *fen);
 void generateFen(Board board, char *fen);
 
-void printBB(uint64_t bb);
+void printBB(const uint64_t bb);
+int mirrorLSB(const uint64_t bb);
 
 
 #endif /* BOARD_H_ */
