@@ -10,16 +10,24 @@ You are also free to challenge it on lichess.org: https://lichess.org/@/Achillee
 
 ### Evaluation
 - Material count
-- Pawn structure
-- Pair of bishops
-- Rooks on open files, on the sevent rank, and on the same file
-- King safety
 - Piece-Square tables
+
+- Pawn structure
+	- Isolated Pawns
+	- Doubled Pawns
+	- Passed Pawns
+	
+- Bishop and knight pair
+
+- Rooks
+	- Open/Semi-open files
+	- Seventh rank
+	- Doubled rooks
 
 ### Search
 - AlphaBeta Pruning
 
-> Note that the project is under active development and new features will come shortly.
+> The project is under active development and new features will come shortly.
 
 ## Running the code
 
