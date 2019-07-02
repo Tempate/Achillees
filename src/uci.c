@@ -36,8 +36,6 @@ void listen(void) {
 			uci(); break;
 		} else if (strncmp(part, "isready", 7) == 0) {
 			isready(); break;
-		} else if (strncmp(part, "ucinewgame", 10) == 0) {
-			ucinewgame(board); break;
 		} else if (strncmp(part, "quit", 4) == 0) {
 			return;
 		}
