@@ -332,7 +332,7 @@ void printBB(const uint64_t bb) {
 
 
 // This lookup table is used to mirror the piece-square tables for black
-static inline int mirrorLSB(const uint64_t bb) {
+int mirrorLSB(const uint64_t bb) {
 	static const int mirror64[64] = {
 		56,	57,	58,	59,	60,	61,	62,	63,
 		48,	49,	50,	51,	52,	53,	54,	55,
