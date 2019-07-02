@@ -135,23 +135,11 @@ static int pieceSquareTables(Board board, const int phase, const int color) {
 		{ -34, -30, -28, -27, -27, -28, -30, -34, -17, -13, -11, -10, -10, -11, -13, -17, -2, 2, 4, 5, 5, 4, 2, -2, 11, 15, 17, 18, 18, 17, 15, 11, 22, 26, 28, 29, 29, 28, 26, 22, 31, 34, 37, 38, 38, 37, 34, 31, 38, 41, 44, 45, 45, 44, 41, 38, 42, 46, 48, 50, 50, 48, 46, 42 }
 	}};
 
-	// This lookup table is used to mirror the piece-square tables for black
-	static const int mirror64[64] = {
-		56,	57,	58,	59,	60,	61,	62,	63,
-		48,	49,	50,	51,	52,	53,	54,	55,
-		40,	41,	42,	43,	44,	45,	46,	47,
-		32,	33,	34,	35,	36,	37,	38,	39,
-		24,	25,	26,	27,	28,	29,	30,	31,
-		16,	17,	18,	19,	20,	21,	22,	23,
-		8,	9,	10,	11,	12,	13,	14,	15,
-		0,	1,	2,	3,	4,	5,	6,	7
-	};
-
 	uint64_t bb;
 
 	int index, score, opening = 0, endgame = 0;
 
-	void *indexFunc = (color == WHITE) ? bitScanForward : mirrorLSB;
+	int (*indexFunc)(uint64_t) = (color == WHITE) ? bitScanForward : mirrorLSB;
 
 	for (int piece = PAWN; piece <= KING; piece++) {
 		bb = board.pieces[color][piece];
@@ -177,22 +165,24 @@ static int pieceSquareTables(Board board, const int phase, const int color) {
 static int pawnStructure(Board board, const int color) {
 	static const uint64_t neighborPawns[8] = {0x2020202020200, 0x5050505050500, 0xa0a0a0a0a0a00, 0x14141414141400, 0x28282828282800, 0x50505050505000, 0xa0a0a0a0a0a000, 0x40404040404000};
 
-	uint64_t bb = board.pieces[color][PAWN], opBB = board.pieces[1 ^ color][PAWN];
+	const uint64_t bb = board.pieces[color][PAWN], opBB = board.pieces[1 ^ color][PAWN];
+	uint64_t aux = bb;
+
 	int score = 0, pawn, neighbors;
 
 	if (bb) do {
-		pawn = bitScanForward(bb);
+		pawn = bitScanForward(aux);
 		neighbors = neighborPawns[get_file(pawn)];
 
-		if ((pow2[pawn << 8] & board.pieces[color][PAWN]))
+		if ((pow2[pawn + 8] & bb))
 			score -= DOUBLED_PAWN;
 
-		if ((neighbors & board.pieces[color][PAWN]) == 0)
+		if ((neighbors & bb) == 0)
 			score -= ISOLATED_PAWN;
 
-		if ((neighbors & board.pieces[1 ^ color][PAWN]) == 0)
+		if ((neighbors & opBB) == 0)
 			score += PASSED_PAWN;
-	} while (unsetLSB(bb));
+	} while (unsetLSB(aux));
 
 	return score;
 }
