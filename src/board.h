@@ -38,8 +38,8 @@ void printBoard(Board board);
 void updateBoard(Board *board);
 void updateOccupancy(Board *board);
 
-void setBits  (Board *board, int color, int piece, int index);
-void unsetBits(Board *board, int color, int piece, int index);
+void setBits  (Board *board, const int color, const int piece, const int index);
+void unsetBits(Board *board, const int color, const int piece, const int index);
 
 void printMoves(Move *moves, int n);
 void printMove (Move move, int nodes);

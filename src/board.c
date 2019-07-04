@@ -3,6 +3,7 @@
 
 #include "board.h"
 #include "play.h"
+#include "hashtables.h"
 
 
 static const char *sqToCoord(int sq);
@@ -91,14 +92,20 @@ void updateOccupancy(Board *board) {
 	board->empty = ~board->occupied;
 }
 
-void setBits(Board *board, int color, int piece, int index) {
-	setBit(&board->pieces[color][piece], index);
+void setBits(Board *board, const int color, const int piece, const int index) {
+	// Sets the bit on the general board for that player
 	setBit(&board->players[color], index);
+
+	// Sets the bit on the specific board for that piece
+	setBit(&board->pieces[color][piece], index);
 }
 
-void unsetBits(Board *board, int color, int piece, int index) {
-	unsetBit(&board->pieces[color][piece], index);
+void unsetBits(Board *board, const int color, const int piece, const int index) {
+	// Unsets the bit on the general board for that player
 	unsetBit(&board->players[color], index);
+
+	// Unsets the bit on the specific board for that piece
+	unsetBit(&board->pieces[color][piece], index);
 }
 
 
@@ -175,7 +182,7 @@ Move textToMove(Board board, char *text) {
 // FEN
 
 // Returns the fens length
-int parseFen(Board *board, char* fen) {
+int parseFen(Board *board, char *fen) {
 	int rank = RANKS-1, file = 0, piece;
 	uint64_t sqr;
 	int i = 0;
@@ -239,7 +246,10 @@ int parseFen(Board *board, char* fen) {
 		--i;
 	}
 
+	board->key = zobristKey(*board);
+
 	updateBoard(board);
+	initializeTT();
 
 	return i;
 }
