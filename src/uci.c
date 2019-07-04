@@ -1,4 +1,5 @@
 #include <string.h>
+#include <assert.h>
 #include <time.h>
 
 #include "main.h"
@@ -6,6 +7,7 @@
 #include "play.h"
 #include "search.h"
 #include "eval.h"
+#include "hashtables.h"
 
 
 #define MAX_DEPTH 5
@@ -16,7 +18,7 @@ static void ucinewgame(Board *board);
 static void position(Board *board, char *s);
 static void go(Settings *settings, char *s);
 static void bestmove(Board board, Settings settings);
-static void eval_(Board board);
+static void evalCmd(Board board);
 static void perftUntilDepth(Board board, const int depth);
 
 
@@ -66,7 +68,9 @@ void listen(void) {
 			depth = atoi(part + 6);
 			perftUntilDepth(*board, depth);
 		} else if (strncmp(part, "eval", 4) == 0) {
-			eval_(*board);
+			evalCmd(*board);
+		} else if (strncmp(part, "key", 3) == 0) {
+			printf("Board Key: %" PRIu64 "\t Key: %" PRIu64 "\n", board->key, zobristKey(*board));
 		} else if (strncmp(part, "quit", 4) == 0) {
 			quit = 1;
 		}
@@ -119,6 +123,9 @@ static void position(Board *board, char *s) {
 		while ((moveText = strtok_r(rest, " ", &rest))) {
 			move = textToMove(*board, moveText);
 			makeMove(board, move, history);
+			updateBoardKey(board, move, *history);
+
+			assert(board->key == zobristKey(*board));
 		}
 	}
 
@@ -186,7 +193,7 @@ static void bestmove(Board board, Settings settings) {
 	fflush(stdout);
 }
 
-static void eval_(Board board) {
+static void evalCmd(Board board) {
 	int score = eval(board);
 
 	if (board.turn == BLACK)

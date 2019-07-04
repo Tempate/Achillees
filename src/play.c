@@ -1,12 +1,12 @@
 #include "board.h"
 #include "play.h"
+#include "hashtables.h"
 
 
 void checkCapture(Board *board, History *history, int index, int color);
-int findPiece(Board board, uint64_t toBB, int color);
 void removeCastlingForRook(Board *board, int index, int color);
 
-static const int castleLookup[4][3] = {{6, 7, 5}, {2, 0, 3}, {62, 63, 61}, {58, 56, 59}};
+const int castleLookup[4][3] = {{6, 7, 5}, {2, 0, 3}, {62, 63, 61}, {58, 56, 59}};
 
 
 long perft(Board board, const int depth) {
@@ -34,9 +34,8 @@ long perft(Board board, const int depth) {
 
 
 void makeMove(Board *board, Move move, History *history) {
-	const int color = move.color, opColor = 1 ^ color;
-
 	static const int removeCastling[2] = {12, 3};
+	const int color = move.color, opColor = 1 ^ color;
 
 	int castle;
 
@@ -50,12 +49,9 @@ void makeMove(Board *board, Move move, History *history) {
 	switch (move.piece) {
 	case PAWN:
 		if (board->enPassant && move.to == board->enPassant) {
-			// Removes a pawn captured en passant
 			unsetBits(board, opColor, PAWN, move.to - 8 + 16*color);
-			// Move the pawn to the en passant square
 			setBits(board, color, PAWN, move.to);
 		} else if (move.promotion) {
-			// Sets the bit for the new piece
 			setBits(board, color, move.promotion, move.to);
 			checkCapture(board, history, move.to, opColor);
 		} else {
@@ -63,13 +59,17 @@ void makeMove(Board *board, Move move, History *history) {
 			checkCapture(board, history, move.to, opColor);
 		}
 
-		board->enPassant = (abs(move.to - move.from) == 16) ? move.from + 8 - 16*color : 0;
+		if (abs(move.to - move.from) == 16) {
+			board->enPassant = move.from + 8 - 16 * color;
+		} else {
+			board->enPassant = 0;
+		}
+
 		board->fiftyMoves = 0;
 
 		break;
 	case KING:
-		// Removes castling for the kings color
-		board->castling &= removeCastling[color];            // WHITE: 1100   BLACK: 0011
+		board->castling &= removeCastling[color];	// WHITE: 1100   BLACK: 0011
 		board->enPassant = 0;
 		++(board->fiftyMoves);
 
@@ -89,7 +89,6 @@ void makeMove(Board *board, Move move, History *history) {
 		/* no break */
 	default:
 		board->enPassant = 0;
-
 		setBits(board, color, move.piece, move.to);
 		checkCapture(board, history, move.to, opColor);
 	}
@@ -174,9 +173,11 @@ int findPiece(Board board, uint64_t toBB, int color) {
 }
 
 void removeCastlingForRook(Board *board, int index, int color) {
+	static const int removeCastling[2][2] = {{14, 11}, {13, 7}};
+
 	if (index == 56*color) {
-		board->castling &= 13 - 6*color;  // WHITE: 1101   BLACK: 0111
+		board->castling &= removeCastling[1][color];  // WHITE: 1101   BLACK: 0111
 	} else if (index == 56*color + 7) {
-		board->castling &= 14 - 3*color;  // WHITE: 1110   BLACK: 1011
+		board->castling &= removeCastling[0][color];  // WHITE: 1110   BLACK: 1011
 	}
 }

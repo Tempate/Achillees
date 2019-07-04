@@ -1,6 +1,7 @@
 #include <string.h>
 #include <math.h>
 
+#include "main.h"
 #include "board.h"
 #include "play.h"
 #include "hashtables.h"
