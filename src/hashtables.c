@@ -344,6 +344,10 @@ void updateBoardKey(Board *board, Move move, History history) {
 	board->key ^= randomKeys[TURN_OFFSET];
 }
 
+/*
+ * Saves all the separate elements into a position.
+ * Only the move is actually compressed.
+ */
 Position compressPosition(uint64_t key, Move move, int score, int depth, int type) {
 	Position pos = (Position) {
 		.key   = key,
