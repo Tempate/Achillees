@@ -1,6 +1,7 @@
 
 #include "board.h"
 #include "play.h"
+#include "hashtables.h"
 
 #include <time.h>
 #include <string.h>
@@ -108,4 +109,39 @@ void testPerft(const char* filename, const int depth) {
 	free(rest);
 	free(fen);
 	free(c);
+}
+
+void testKeys(void) {
+	Board *board1 = malloc(sizeof(Board));
+	Board *board2 = malloc(sizeof(Board));
+
+	Move move;
+	History history;
+
+
+	parseFen(board1, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK2R w KQkq -");
+	parseFen(board2, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK1R1 b Qkq -");
+
+	move = textToMove(*board1, "h1g1");
+
+	printf("%" PRIu64 "\n", board1->key);
+	printBoard(*board1);
+
+	printf("%" PRIu64 "\n", board2->key);
+	printBoard(*board2);
+
+	makeMove(board1, move, &history);
+	updateBoardKey(board1, move, history);
+
+	printf("%" PRIu64 "\n", board1->key);
+	printBoard(*board1);
+
+	updateBoardKey(board1, move, history);
+	undoMove(board1, move, history);
+
+	printf("%" PRIu64 "\n", board1->key);
+	printBoard(*board1);
+
+	free(board1);
+	free(board2);
 }
