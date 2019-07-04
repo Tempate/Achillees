@@ -6,6 +6,7 @@
 C_SRCS += \
 ../src/board.c \
 ../src/eval.c \
+../src/hashtables.c \
 ../src/main.c \
 ../src/moves.c \
 ../src/play.c \
@@ -16,6 +17,7 @@ C_SRCS += \
 OBJS += \
 ./src/board.o \
 ./src/eval.o \
+./src/hashtables.o \
 ./src/main.o \
 ./src/moves.o \
 ./src/play.o \
@@ -26,6 +28,7 @@ OBJS += \
 C_DEPS += \
 ./src/board.d \
 ./src/eval.d \
+./src/hashtables.d \
 ./src/main.d \
 ./src/moves.d \
 ./src/play.d \
