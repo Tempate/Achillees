@@ -45,7 +45,7 @@ make all
 ```
 
 3. An executable should now appear inside your Release folder, you can run it by doing: 
-``
+```
 ./Achillees
 ```
 
