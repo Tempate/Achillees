@@ -26,6 +26,7 @@ You are also free to challenge it on lichess.org: https://lichess.org/@/Achillee
 
 ### Search
 - AlphaBeta Pruning
+- Transposition/Refutation Tables
 
 > The project is under active development and new features will come shortly.
 
@@ -43,10 +44,13 @@ git clone https://github.com/Tempate/Achillees
 make all
 ```
 
-3. An executable should now appear inside your Release folder, you can run it by doing `./Achillees`
+3. An executable should now appear inside your Release folder, you can run it by doing: 
+``
+./Achillees
+```
 
 ## Credits
 
-Special thanks to the [chessprogramming wiki](), as most of the knowledge needed came from reading through it, to [ROCE](http://www.rocechess.ch/rocee.html), without which it would have taken ages to pass perft, and to [Daily Chess](https://www.dailychess.com/rival/programming/index.php) for there fantastic guide.
+Special thanks to the [chessprogramming wiki](https://www.chessprogramming.org/Main_Page), as most of the knowledge needed came from reading through it, to [ROCE](http://www.rocechess.ch/rocee.html), without which it would have taken ages to pass perft, and to [Daily Chess](https://www.dailychess.com/rival/programming/index.php) for their fantastic guide.
 
 I also feel the need to thank everyone on `##chessprogramming` on [Freenode IRC](https://webchat.freenode.net) for their support, encouragement, and help.
