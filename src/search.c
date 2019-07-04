@@ -11,24 +11,12 @@
 Position alphabeta(Board board, const int depth, int alpha, const int beta);
 
 
-// 8/k7/3p4/p2P1p2/P2P1P2/8/8/K7 w - -
-int count = 0;
-
 Move search(Board board, Settings settings) {
 	Position best;
 	Move move;
 
-	struct timespec start, end;
-
-	clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-
 	best = alphabeta(board, settings.depth, -MAX_SCORE - 1, MAX_SCORE + 1);
 	move = decompressMove(board, best.move);
-
-	clock_gettime(CLOCK_MONOTONIC_RAW, &end);
-
-	printf("Time: %" PRIu64 "\n", (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000);
-	printf("Score: %d\n", best.score);
 
 	return move;
 }
