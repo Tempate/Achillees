@@ -351,15 +351,15 @@ void updateBoardKey(Board *board, Move move, History history) {
 Position compressPosition(uint64_t key, Move move, int score, int depth, int type) {
 	Position pos = (Position) {
 		.key   = key,
-		.score = score & 0xffff,
-		.depth = depth & 0xff,
-		.type  = type  & 0x3
+		.score = score,
+		.depth = depth,
+		.type  = type
 	};
 
 	pos.move = (MoveCompressed) {
-		.from = move.from & 0x3f,
-		.to = move.to & 0x3f,
-		.promotion = move.promotion & 0x3
+		.from = move.from,
+		.to = move.to,
+		.promotion = move.promotion
 	};
 
 	return pos;
