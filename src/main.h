@@ -25,6 +25,8 @@ typedef struct {
 	uint64_t empty;
 	uint64_t occupied;
 
+	uint64_t key;
+
 	int turn;
 	int castling;
 	int enPassant;
