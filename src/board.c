@@ -113,7 +113,7 @@ void unsetBits(Board *board, const int color, const int piece, const int index) 
 // MOVES
 
 void printMoves(Move *moves, int n) {
-	for (int i = 0; i < n; i++)
+	for (int i = 0; i < n; ++i)
 		printMove(moves[i], 0);
 
 	printf("\nTotal: %d\n", n);
@@ -131,6 +131,7 @@ void printMove(Move move, int nodes) {
 	}
 
 	free(text);
+
 }
 
 void moveToText(Move move, char *text) {
@@ -271,7 +272,7 @@ void generateFen(Board board, char *fen) {
 				if (blanks > 0)
 					fen[++k] = blanks;
 
-				for (int i = 0; i < PIECES; i++) {
+				for (int i = 0; i < PIECES; ++i) {
 					if (board.pieces[WHITE][i] & sqr) {
 						fen[++k] = pieceChars[i];
 						break;

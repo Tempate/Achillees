@@ -23,6 +23,8 @@ You are also free to challenge it on lichess.org: https://lichess.org/@/Achillee
 	- Open/Semi-open files
 	- Seventh rank
 	- Doubled rooks
+	
+- King safety
 
 ### Search
 - AlphaBeta Pruning

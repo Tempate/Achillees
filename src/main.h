@@ -35,20 +35,4 @@ typedef struct {
 	int ply;
 } Board;
 
-typedef struct {
-	int stop;
-
-	int depth;
-	int nodes;
-	int mate;
-
-	int wtime;
-	int btime;
-	int winc;
-	int binc;
-
-	int movestogo;
-	int movetime;
-} Settings;
-
 #endif /* MAIN_H_ */

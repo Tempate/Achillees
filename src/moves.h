@@ -23,5 +23,7 @@ typedef struct {
 int legalMoves(Board board, Move *moves);
 int kingInCheck(Board board, uint64_t kingBB, int color);
 
+const uint64_t kingMoves(int index);
+
 
 #endif /* SRC_MOVES_H_ */

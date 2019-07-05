@@ -22,7 +22,7 @@ long perft(Board board, const int depth) {
 		newDepth = depth - 1;
 		k = legalMoves(board, moves);
 
-		for (int i = 0; i < k; i++) {
+		for (int i = 0; i < k; ++i) {
 			makeMove(&board, moves[i], &history);
 			nodes += perft(board, newDepth);
 			undoMove(&board, moves[i], history);
@@ -164,7 +164,7 @@ void checkCapture(Board *board, History *history, int index, int color) {
 }
 
 int findPiece(Board board, uint64_t toBB, int color) {
-	for (int i = 0; i < PIECES; i++) {
+	for (int i = 0; i < PIECES; ++i) {
 		if (toBB & board.pieces[color][i])
 			return i;
 	}
