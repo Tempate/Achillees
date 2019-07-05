@@ -6,73 +6,104 @@
 #include "eval.h"
 #include "search.h"
 #include "hashtables.h"
+#include "uci.h"
 
 
-Position alphabeta(Board board, const int depth, int alpha, const int beta);
+static int alphabeta(Board board, const int depth, int alpha, const int beta);
+static time_t timeManagement(Board board);
 
+time_t endTime;
+clock_t start;
 
-Move search(Board board, Settings settings) {
-	Position best;
-	Move move;
+Move search(Board board) {
+	endTime = timeManagement(board);
+	start = clock();
 
-	best = alphabeta(board, settings.depth, -MAX_SCORE - 1, MAX_SCORE + 1);
-	move = decompressMove(board, best.move);
+	for (int depth = 1; depth <= settings.depth && !settings.stop; ++depth) {
+		alphabeta(board, depth, -2 * MAX_SCORE, 2 * MAX_SCORE);
+	}
+
+	const int index = board.key % HASHTABLE_MAX_SIZE;
+	Move move = decompressMove(board, tt[index].move);
 
 	return move;
 }
 
 /*
  * A basic implementation of alpha-beta pruning
- * Checkmate in n moves is found on depth n+1
+ * Checkmate in n moves is found at depth n+1
  * alpha is the value to maximize and beta the value to minimize.
- * The initial position must have >= 1 legal moves and
- * the initial depth must be >= 1.
+ * The initial position must have >= 1 legal moves and the initial depth must be >= 1.
  */
-Position alphabeta(Board board, const int depth, int alpha, const int beta) {
+static int alphabeta(Board board, const int depth, int alpha, const int beta) {
+	if (clock() - start > endTime)
+		settings.stop = 1;
+
+	if (settings.stop)
+		return 0;
+
+	if (depth == 0)
+		return eval(board);
+
+	const int index = board.key % HASHTABLE_MAX_SIZE;
+
+	// Uses the entry on the TT if one is found
+	if (tt[index].key == board.key && tt[index].depth >= depth)
+		return tt[index].score;
+
 	Move moves[218];
-	History history;
-	Position node, best;
+	const int nMoves = legalMoves(board, moves);
 
-	int k, index;
+	// It's a leaf node, there are no legal moves
+	if (nMoves == 0)
+		return finalEval(board, depth);
 
-	if (depth == 0) {
-		best.score = eval(board);
-	} else {
-		k = legalMoves(board, moves);
+	int bestScore = -2 * MAX_SCORE;
+	Move bestMove;
 
-		if (k == 0) {
-			best.score = finalEval(board, depth);
-		} else {
-			best.score = -2 * MAX_SCORE;
+	for (int i = 0; i < nMoves; ++i) {
+		History history;
 
-			for (int i = 0; i < k; i++) {
-				makeMove(&board, moves[i], &history);
-				updateBoardKey(&board, moves[i], history);
+		makeMove(&board, moves[i], &history);
+		updateBoardKey(&board, moves[i], history);
 
-				index = board.key % HASHTABLE_MAX_SIZE;
+		int score = -alphabeta(board, depth-1, -beta, -alpha);
 
-				if (tt[index].key != board.key || tt[index].depth < depth) {
-					node = alphabeta(board, depth - 1, -beta, -alpha);
+		updateBoardKey(&board, moves[i], history);
+		undoMove(&board, moves[i], history);
 
-					// Saves the node on the transposition table
-					tt[index] = compressPosition(board.key, moves[i], -node.score, depth, 0);
-				}
+		// Updates the best value and pruns the tree when alpha >= beta
+		if (score > bestScore) {
+			bestScore = score;
+			bestMove = moves[i];
 
-				// Updates the best value and pruns the tree when alpha >= beta
-				if (tt[index].score > best.score) {
-					best = tt[index];
+			if (bestScore > alpha)
+				alpha = bestScore;
 
-					if (best.score >= beta) break;
-
-					if (best.score > alpha)
-						alpha = best.score;
-				}
-
-				updateBoardKey(&board, moves[i], history);
-				undoMove(&board, moves[i], history);
-			}
+			if (alpha >= beta) break;
 		}
 	}
 
-	return best;
+	if (settings.stop == 0) {
+		tt[index] = compressPosition(board.key, bestMove, bestScore, depth, 0);
+	}
+
+	return bestScore;
+}
+
+static time_t timeManagement(Board board) {
+	clock_t endTime = (board.turn == WHITE) ? settings.wtime : settings.btime;
+
+	/*
+	if (endTime == 0) {
+		endTime = 0xffffffff;
+	}
+	*/
+
+	// This is done so it can be compared against clocks
+	endTime *= CLOCKS_PER_SEC / 1000;
+
+	endTime /= 50;
+
+	return endTime;
 }
