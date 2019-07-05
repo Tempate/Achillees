@@ -2,46 +2,38 @@
 #include <assert.h>
 #include <time.h>
 
+#include <unistd.h>
+#include <pthread.h>
+
 #include "main.h"
 #include "board.h"
 #include "play.h"
 #include "search.h"
 #include "eval.h"
 #include "hashtables.h"
+#include "uci.h"
 
-
-#define MAX_DEPTH 5
 
 static void uci(void);
 static void isready(void);
 static void ucinewgame(Board *board);
 static void position(Board *board, char *s);
 static void go(Settings *settings, char *s);
-static void bestmove(Board board, Settings settings);
+static void *bestmove(void *args);
 static void evalCmd(Board board);
-static void perftUntilDepth(Board board, const int depth);
 
+static void perftUntilDepth(Board board, const int depth);
+static void defaultSettings(Settings *settings);
+
+Settings settings;
 
 void listen(void) {
 	Board *board = malloc(sizeof(Board));
-	Settings settings;
 
 	char message[4096], *r, *part;
 	int depth, quit = 0;
 
-	while (1) {
-		r = fgets(message, 4096, stdin);
-		if (r == NULL) break;
-		part = message;
-
-		if (strncmp(part, "uci", 3) == 0) {
-			uci(); break;
-		} else if (strncmp(part, "isready", 7) == 0) {
-			isready(); break;
-		} else if (strncmp(part, "quit", 4) == 0) {
-			return;
-		}
-	}
+	pthread_t worker;
 
 	while (!quit) {
 		r = fgets(message, 4096, stdin);
@@ -51,17 +43,27 @@ void listen(void) {
 
 		part = message;
 
-		if (strncmp(part, "isready", 7) == 0) {
-			isready();
-		} else if (strncmp(part, "ucinewgame", 10) == 0) {
+		if (strncmp(part, "ucinewgame", 10) == 0) {
 			ucinewgame(board);
+		} else if (strncmp(part, "uci", 3) == 0) {
+			uci();
+		} else if (strncmp(part, "isready", 7) == 0) {
+			isready();
 		} else if (strncmp(part, "position", 8) == 0) {
 			position(board, part + 9);
 		} else if (strncmp(part, "go", 2) == 0) {
 			go(&settings, part + 2);
-			bestmove(*board, settings);
+
+			/*
+			 * Creates a second thread to search so that the UCI thread
+			 * can still reply to commands.
+			 */
+			pthread_create(&worker, NULL, bestmove, (void *) board);
 		} else if (strncmp(part, "stop", 4) == 0) {
 			settings.stop = 1;
+
+			// Waits until the worker thread has stopped.
+			pthread_join(worker, NULL);
 		} else if (strncmp(part, "print", 5) == 0) {
 			printBoard(*board);
 		} else if (strncmp(part, "perft", 5) == 0) {
@@ -69,8 +71,6 @@ void listen(void) {
 			perftUntilDepth(*board, depth);
 		} else if (strncmp(part, "eval", 4) == 0) {
 			evalCmd(*board);
-		} else if (strncmp(part, "key", 3) == 0) {
-			printf("Board Key: %" PRIu64 "\t Key: %" PRIu64 "\n", board->key, zobristKey(*board));
 		} else if (strncmp(part, "quit", 4) == 0) {
 			quit = 1;
 		}
@@ -133,17 +133,7 @@ static void position(Board *board, char *s) {
 }
 
 static void go(Settings *settings, char *s) {
-	// Default values for 1+0
-	settings->stop = 0;
-	settings->depth = MAX_DEPTH;
-	settings->nodes = 0;
-	settings->mate = 0;
-	settings->wtime = 60000;
-	settings->btime = 60000;
-	settings->winc = 0;
-	settings->binc = 0;
-	settings->movestogo = 20;
-	settings->movetime = 0;
+	defaultSettings(settings);
 
 	while (s[1] != '\0' && s[1] != '\n') {
 		if (strncmp(s, "infinite", 8) == 0) {
@@ -182,15 +172,20 @@ static void go(Settings *settings, char *s) {
 	}
 }
 
-static void bestmove(Board board, Settings settings) {
+static void *bestmove(void *args) {
+	Board *board = (Board *) args;
 	Move move;
 	char pv[6];
 
-	move = search(board, settings);
+	move = search(*board);
 	moveToText(move, pv);
 
 	fprintf(stdout, "bestmove %s\n", pv);
 	fflush(stdout);
+
+	pthread_exit(NULL);
+
+	return NULL;
 }
 
 static void evalCmd(Board board) {
@@ -220,4 +215,17 @@ static void perftUntilDepth(Board board, const int depth) {
 
 	fprintf(stdout, "nodes %ld\n", nodes);
 	fflush(stdout);
+}
+
+static void defaultSettings(Settings *settings) {
+	settings->stop = 0;
+	settings->depth = MAX_DEPTH;
+	settings->nodes = 0;
+	settings->mate = 0;
+	settings->wtime = 60000;
+	settings->btime = 60000;
+	settings->winc = 0;
+	settings->binc = 0;
+	settings->movestogo = 20;
+	settings->movetime = 0;
 }
