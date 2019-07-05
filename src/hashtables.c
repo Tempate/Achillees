@@ -219,7 +219,7 @@ static const uint64_t randomKeys[781] = {
 };
 
 void initializeTT(void) {
-	for (int i = 0; i < HASHTABLE_MAX_SIZE; i++) {
+	for (int i = 0; i < HASHTABLE_MAX_SIZE; ++i) {
 		tt[i] = (Position) {.key=0};
 	}
 }
