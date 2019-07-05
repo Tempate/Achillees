@@ -2,7 +2,11 @@
 #include "eval.h"
 
 
-enum {PAWN_VALUE=100, KNIGHT_VALUE=325, BISHOP_VALUE=325, ROOK_VALUE=525, QUEEN_VALUE=900};
+#define PAWN_VAL			100
+#define KNIG_VAL			325
+#define BISH_VAL			325
+#define ROOK_VAL			550
+#define QUEE_VAL			900
 
 #define BISHOP_PAIR 		+25
 #define KNIGHT_PAIR			+15
@@ -16,15 +20,19 @@ enum {PAWN_VALUE=100, KNIGHT_VALUE=325, BISHOP_VALUE=325, ROOK_VALUE=525, QUEEN_
 #define ROOK_OPEN_FILE 		+15
 #define ROOK_SEMIOPEN_FILE 	+10
 
+#define NEAR_KING			+5
+
 
 
 static int getPhase(Count whiteCount, Count blackCount);
-static int materialCount(Count count);
+static inline int taperedEval(const int phase, const int opening, const int endgame);
 
+static int materialCount(Count count);
 static int pieceSquareTables(Board board, const int phase, const int color);
 
 static int pawnStructure(Board board, const int color);
 static int rookScore    (Board board, const int color);
+static int kingSafety(Board board, const int color);
 
 
 /*
@@ -68,12 +76,14 @@ int eval(Board board) {
 
 	const int phase = getPhase(whiteCount, blackCount);
 
-	int score = 0;
-	score += materialCount(whiteCount) - materialCount(blackCount);
-	score += pieceSquareTables(board, phase, WHITE) - pieceSquareTables(board, phase, BLACK);
+	int score =
+			materialCount(whiteCount) - materialCount(blackCount) +
+			pieceSquareTables(board, phase, WHITE) - pieceSquareTables(board, phase, BLACK) +
+			pawnStructure(board, WHITE) - pawnStructure(board, BLACK) +
+			rookScore(board, WHITE) - rookScore(board, BLACK);
 
-	score += pawnStructure(board, WHITE) - pawnStructure(board, BLACK);
-	score += rookScore(board, WHITE) - rookScore(board, BLACK);
+	// King safety is only taken into account in the opening
+	// score += taperedEval(phase, kingSafety(board, WHITE) - kingSafety(board, BLACK), 0);
 
 	if (board.turn == BLACK)
 		score = -score;
@@ -99,8 +109,12 @@ static int getPhase(Count whiteCount, Count blackCount) {
     return (phase * 256 + (totalPhase / 2)) / totalPhase;
 }
 
-static inline int materialCount(Count count) {
-	int score = PAWN_VALUE * count.nPawns + KNIGHT_VALUE * count.nKnights + BISHOP_VALUE * count.nBishops + ROOK_VALUE * count.nRooks + QUEEN_VALUE * count.nQueens;
+static inline int taperedEval(const int phase, const int opening, const int endgame) {
+	return ((opening * (256 - phase)) + (endgame * phase)) / 256;
+}
+
+static int materialCount(Count count) {
+	int score = PAWN_VAL * count.nPawns + KNIG_VAL * count.nKnights + BISH_VAL * count.nBishops + ROOK_VAL * count.nRooks + QUEE_VAL * count.nQueens;
 
 	if (count.nBishops >= 2)
 		score += BISHOP_PAIR;
@@ -151,7 +165,7 @@ static int pieceSquareTables(Board board, const int phase, const int color) {
 		} while (unsetLSB(bb));
 	}
 
-	score = ((opening * (256 - phase)) + (endgame * phase)) / 256;
+	score = taperedEval(phase, opening, endgame);
 
 	return score;
 }
@@ -220,6 +234,15 @@ static int rookScore(Board board, const int color) {
 				score += DOUBLED_ROOKS;
 		}
 	} while (unsetLSB(bb));
+
+	return score;
+}
+
+static int kingSafety(Board board, const int color) {
+	const int index = bitScanForward(board.pieces[color][KING]);
+	const uint64_t surroundings = kingMoves(index);
+
+	int score = NEAR_KING * popCount(board.players[color] & surroundings);
 
 	return score;
 }
