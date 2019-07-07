@@ -29,6 +29,7 @@ You are also free to challenge it on lichess.org: https://lichess.org/@/Achillee
 ### Search
 - AlphaBeta Pruning
 - Transposition/Refutation Tables
+- Move ordering
 
 > The project is under active development and new features will come shortly.
 
