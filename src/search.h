@@ -4,7 +4,9 @@
 #define MAX_DEPTH 50
 #define DEF_DEPTH 5
 
-Move search(Board board);
+enum {EXACT, HIGHER_BOUND, LOWER_BOUND};
+
+Move search(Board *board);
 
 
 #endif /* SRC_SEARCH_H_ */
