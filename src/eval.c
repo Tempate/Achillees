@@ -1,4 +1,5 @@
 #include "board.h"
+#include "draw.h"
 #include "eval.h"
 
 
@@ -23,27 +24,26 @@
 #define NEAR_KING			+5
 
 
-
 static int getPhase(Count whiteCount, Count blackCount);
 static inline int taperedEval(const int phase, const int opening, const int endgame);
 
 static int materialCount(Count count);
-static int pieceSquareTables(Board board, const int phase, const int color);
+static int pieceSquareTables(const Board *board, const int phase, const int color);
 
-static int pawnStructure(Board board, const int color);
-static int rookScore    (Board board, const int color);
-static int kingSafety(Board board, const int color);
+static int pawnStructure(const Board *board, const int color);
+static int rookScore    (const Board *board, const int color);
+static int kingSafety   (const Board *board, const int color);
 
 
 /*
  * Evaluates a position which has no possible moves.
  * Returns 1 on checkmate and 0 on stalemate.
  */
-int finalEval(Board board, const int depth) {
-	const int color = board.turn;
+int finalEval(const Board *board, const int depth) {
+	const int color = board->turn;
 	int result;
 
-	if (kingInCheck(board, board.pieces[color][KING], color)) {
+	if (kingInCheck(board, board->pieces[color][KING], color)) {
 		result = -MAX_SCORE - depth;
 	} else {
 		result = 0;
@@ -56,36 +56,42 @@ int finalEval(Board board, const int depth) {
  * This is the main evaluation function.
  * Scores are positive for the side about to play.
  */
-int eval(Board board) {
+int eval(const Board *board) {
 	const Count whiteCount = (Count) {
-		.nPawns   = popCount(board.pieces[WHITE][PAWN]),
-		.nKnights = popCount(board.pieces[WHITE][KNIGHT]),
-		.nBishops = popCount(board.pieces[WHITE][BISHOP]),
-		.nRooks   = popCount(board.pieces[WHITE][ROOK]),
-		.nQueens  = popCount(board.pieces[WHITE][QUEEN]),
+		.nPawns   = popCount(board->pieces[WHITE][PAWN]),
+		.nKnights = popCount(board->pieces[WHITE][KNIGHT]),
+		.nBishops = popCount(board->pieces[WHITE][BISHOP]),
+		.nRooks   = popCount(board->pieces[WHITE][ROOK]),
+		.nQueens  = popCount(board->pieces[WHITE][QUEEN]),
+		.nTotal   = popCount(board->players[WHITE])
 
 	};
 
 	const Count blackCount = (Count) {
-		.nPawns   = popCount(board.pieces[BLACK][PAWN]),
-		.nKnights = popCount(board.pieces[BLACK][KNIGHT]),
-		.nBishops = popCount(board.pieces[BLACK][BISHOP]),
-		.nRooks   = popCount(board.pieces[BLACK][ROOK]),
-		.nQueens  = popCount(board.pieces[BLACK][QUEEN]),
+		.nPawns   = popCount(board->pieces[BLACK][PAWN]),
+		.nKnights = popCount(board->pieces[BLACK][KNIGHT]),
+		.nBishops = popCount(board->pieces[BLACK][BISHOP]),
+		.nRooks   = popCount(board->pieces[BLACK][ROOK]),
+		.nQueens  = popCount(board->pieces[BLACK][QUEEN]),
+		.nTotal   = popCount(board->players[BLACK])
 	};
+
+	if (isDraw(board))
+		return 0;
 
 	const int phase = getPhase(whiteCount, blackCount);
 
-	int score =
-			materialCount(whiteCount) - materialCount(blackCount) +
-			pieceSquareTables(board, phase, WHITE) - pieceSquareTables(board, phase, BLACK) +
-			pawnStructure(board, WHITE) - pawnStructure(board, BLACK) +
-			rookScore(board, WHITE) - rookScore(board, BLACK);
+	int score = 0;
+
+	score += materialCount(whiteCount) - materialCount(blackCount);
+	score += pieceSquareTables(board, phase, WHITE) - pieceSquareTables(board, phase, BLACK);
+	score += pawnStructure(board, WHITE) - pawnStructure(board, BLACK);
+	score += rookScore(board, WHITE) - rookScore(board, BLACK);
 
 	// King safety is only taken into account in the opening
-	// score += taperedEval(phase, kingSafety(board, WHITE) - kingSafety(board, BLACK), 0);
+	score += taperedEval(phase, kingSafety(board, WHITE) - kingSafety(board, BLACK), 0);
 
-	if (board.turn == BLACK)
+	if (board->turn == BLACK)
 		score = -score;
 
 	return score;
@@ -119,18 +125,15 @@ static int materialCount(Count count) {
 	if (count.nBishops >= 2)
 		score += BISHOP_PAIR;
 
-	if (count.nKnights >= 2)
-		score += KNIGHT_PAIR;
-
 	return score;
 }
 
 /*
- * Gives points to every piece depending on its position on the board.
+ * Gives points to every piece depending on its position on the board->
  * It can be either a bonus or a penalty.
  * It also depends on the stage of the game: opening/middle-game or endgame.
  */
-static int pieceSquareTables(Board board, const int phase, const int color) {
+static int pieceSquareTables(const Board *board, const int phase, const int color) {
 	static const int pst[2][6][64] = {
 	{
 		{ 0, 0, 0, 0, 0, 0, 0, 0, -1, -7, -11, -35, -13, 5, 3, -5, 1, 1, -6, -19, -6, -7, -4, 10, 1, 14, 8, 4, 5, 4, 10, 7, 9, 30, 23, 31, 31, 23, 17, 11, 21, 54, 72, 56, 77, 95, 71, 11, 118, 121, 173, 168, 107, 82, -16, 22, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -156,7 +159,7 @@ static int pieceSquareTables(Board board, const int phase, const int color) {
 	int (*indexFunc)(uint64_t) = (color == WHITE) ? bitScanForward : mirrorLSB;
 
 	for (int piece = PAWN; piece <= KING; piece++) {
-		bb = board.pieces[color][piece];
+		bb = board->pieces[color][piece];
 
 		if (bb) do {
 			index = indexFunc(bb);
@@ -176,10 +179,10 @@ static int pieceSquareTables(Board board, const int phase, const int color) {
  *   - Isolated pawns
  *   - Passed pawns
  */
-static int pawnStructure(Board board, const int color) {
+static int pawnStructure(const Board *board, const int color) {
 	static const uint64_t neighborPawns[8] = {0x2020202020200, 0x5050505050500, 0xa0a0a0a0a0a00, 0x14141414141400, 0x28282828282800, 0x50505050505000, 0xa0a0a0a0a0a000, 0x40404040404000};
 
-	const uint64_t bb = board.pieces[color][PAWN], opBB = board.pieces[1 ^ color][PAWN];
+	const uint64_t bb = board->pieces[color][PAWN], opBB = board->pieces[1 ^ color][PAWN];
 	uint64_t aux = bb;
 
 	int score = 0, pawn, neighbors;
@@ -202,11 +205,11 @@ static int pawnStructure(Board board, const int color) {
 }
 
 
-static int rookScore(Board board, const int color) {
+static int rookScore(const Board *board, const int color) {
 	static const uint64_t files[8] = {0x101010101010101, 0x202020202020202, 0x404040404040404, 0x808080808080808, 0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080};
 	static const uint64_t rank7 = 0xff000000000000, rank2 = 0xff00;
 
-	uint64_t bb = board.pieces[color][ROOK];
+	uint64_t bb = board->pieces[color][ROOK];
 	const uint64_t seventhRank = bb & ((color == WHITE) ? rank7 : rank2);
 
 	int score = 0;
@@ -223,12 +226,15 @@ static int rookScore(Board board, const int color) {
 		// +15 points for rooks on the same file
 		// +10 points for rooks on open files
 		// +3 points for rooks on semi-open files
-		if ((file & board.pieces[color][PAWN]) == 0) {
-			if (file & board.pieces[1 ^ color][PAWN]) {
+		if ((file & board->pieces[color][PAWN]) == 0) {
+			/*
+			if (file & board->pieces[1 ^ color][PAWN]) {
 				score += ROOK_SEMIOPEN_FILE;
 			} else {
 				score += ROOK_OPEN_FILE;
 			}
+			*/
+
 
 			if (file & bb)
 				score += DOUBLED_ROOKS;
@@ -238,11 +244,11 @@ static int rookScore(Board board, const int color) {
 	return score;
 }
 
-static int kingSafety(Board board, const int color) {
-	const int index = bitScanForward(board.pieces[color][KING]);
+static int kingSafety(const Board *board, const int color) {
+	const int index = bitScanForward(board->pieces[color][KING]);
 	const uint64_t surroundings = kingMoves(index);
 
-	int score = NEAR_KING * popCount(board.players[color] & surroundings);
+	int score = NEAR_KING * popCount(board->players[color] & surroundings);
 
 	return score;
 }

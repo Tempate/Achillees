@@ -13,11 +13,13 @@ typedef struct {
 	int nBishops;
 	int nRooks;
 	int nQueens;
+
+	int nTotal;
 } Count;
 
 
-int finalEval(Board board, const int depth);
-int eval(Board board);
+int finalEval(const Board *board, const int depth);
+int eval(const Board *board);
 
 
 #endif /* SRC_EVAL_H_ */
