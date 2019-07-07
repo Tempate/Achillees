@@ -20,9 +20,9 @@ static void ucinewgame(Board *board);
 static void position(Board *board, char *s);
 static void go(Settings *settings, char *s);
 static void *bestmove(void *args);
-static void evalCmd(Board board);
+static void evalCmd(const Board *board);
 
-static void perftUntilDepth(Board board, const int depth);
+static void perftUntilDepth(Board *board, const int depth);
 static void defaultSettings(Settings *settings);
 
 Settings settings;
@@ -34,6 +34,7 @@ void listen(void) {
 	int depth, quit = 0;
 
 	pthread_t worker;
+	int working = 0;
 
 	while (!quit) {
 		r = fgets(message, 4096, stdin);
@@ -59,21 +60,30 @@ void listen(void) {
 			 * can still reply to commands.
 			 */
 			pthread_create(&worker, NULL, bestmove, (void *) board);
+			working = 1;
 		} else if (strncmp(part, "stop", 4) == 0) {
 			settings.stop = 1;
 
 			// Waits until the worker thread has stopped.
-			pthread_join(worker, NULL);
+			if (working == 1) {
+				pthread_join(worker, NULL);
+				working = 0;
+			}
 		} else if (strncmp(part, "print", 5) == 0) {
-			printBoard(*board);
+			printBoard(board);
 		} else if (strncmp(part, "perft", 5) == 0) {
 			depth = atoi(part + 6);
-			perftUntilDepth(*board, depth);
+			perftUntilDepth(board, depth);
 		} else if (strncmp(part, "eval", 4) == 0) {
-			evalCmd(*board);
+			evalCmd(board);
 		} else if (strncmp(part, "quit", 4) == 0) {
 			quit = 1;
 		}
+	}
+
+	if (working == 1) {
+		settings.stop = 1;
+		pthread_join(worker, NULL);
 	}
 
 	free(board);
@@ -104,7 +114,7 @@ static void ucinewgame(Board *board) {
  * position (startpos | fen) (moves e2e4 c7c5)?
  */
 static void position(Board *board, char *s) {
-	History *history = malloc(sizeof(History));
+	History history;
 	Move move;
 
 	char *moveText, *rest;
@@ -121,15 +131,13 @@ static void position(Board *board, char *s) {
 		rest = s;
 
 		while ((moveText = strtok_r(rest, " ", &rest))) {
-			move = textToMove(*board, moveText);
-			makeMove(board, move, history);
-			updateBoardKey(board, move, *history);
+			move = textToMove(board, moveText);
+			makeMove(board, &move, &history);
+			updateBoardKey(board, &move, &history);
 
-			assert(board->key == zobristKey(*board));
+			// assert(board->key == zobristKey(*board));
 		}
 	}
-
-	free(history);
 }
 
 static void go(Settings *settings, char *s) {
@@ -177,7 +185,7 @@ static void *bestmove(void *args) {
 	Move move;
 	char pv[6];
 
-	move = search(*board);
+	move = search(board);
 	moveToText(move, pv);
 
 	fprintf(stdout, "bestmove %s\n", pv);
@@ -188,10 +196,10 @@ static void *bestmove(void *args) {
 	return NULL;
 }
 
-static void evalCmd(Board board) {
+static void evalCmd(const Board *board) {
 	int score = eval(board);
 
-	if (board.turn == BLACK)
+	if (board->turn == BLACK)
 		score = -score;
 
 	fprintf(stdout, "%d\n", score);
@@ -201,7 +209,7 @@ static void evalCmd(Board board) {
 /*
  * Runs perft from 1 to the required depth.
  */
-static void perftUntilDepth(Board board, const int depth) {
+static void perftUntilDepth(Board *board, const int depth) {
 	long nodes = 0;
 
 	clock_t start, duration;
@@ -222,8 +230,8 @@ static void defaultSettings(Settings *settings) {
 	settings->depth = MAX_DEPTH;
 	settings->nodes = 0;
 	settings->mate = 0;
-	settings->wtime = 60000;
-	settings->btime = 60000;
+	settings->wtime = 0;
+	settings->btime = 0;
 	settings->winc = 0;
 	settings->binc = 0;
 	settings->movestogo = 20;

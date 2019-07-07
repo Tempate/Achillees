@@ -6,7 +6,7 @@
 
 int getOffset(const int color, const int piece, const int sqr);
 void updateCastleKey(Board *board, const int oldCast, const int newCast);
-void defaultKeyChanges(Board *board, Move move, History history);
+void defaultKeyChanges(Board *board, const Move *move, const History *history);
 
 
 // Transposition/Refutation Table
@@ -225,18 +225,18 @@ void initializeTT(void) {
 }
 
 /*
- * Generates a unique key for each board.
+ * Generates a unique key for each board->
  * Each piece of each square has a key,
  * each castling enabled has a key,
  * each enPassant file has a key,
  * and white's turn has a key.
  */
-uint64_t zobristKey(Board board) {
+uint64_t zobristKey(const Board *board) {
 	int sqr, castle, offset, pieceOffset;
 	uint64_t bb, key;
 
 	key = 0;
-	castle = board.castling;
+	castle = board->castling;
 
 	/*
 	 * Adds the keys for each piece, of each color.
@@ -244,7 +244,7 @@ uint64_t zobristKey(Board board) {
 	 */
 	for (int color = WHITE; color <= BLACK; ++color) {
 		for (int piece = PAWN; piece <= KING; ++piece) {
-			bb = board.pieces[color][piece];
+			bb = board->pieces[color][piece];
 			pieceOffset = getOffset(color, piece, 0);
 
 			if (bb) do {
@@ -268,21 +268,18 @@ uint64_t zobristKey(Board board) {
 	 * Adds the keys for the enPassant square.
 	 * It just takes into account the file of the enPassant, as the turn would make it unique.
 	 */
-	if (board.enPassant) {
-		offset = ENPA_OFFSET + get_file(board.enPassant);
+	if (board->enPassant) {
+		offset = ENPA_OFFSET + get_file(board->enPassant);
 		key ^= randomKeys[offset];
 	}
 
 	/*
 	 * Adds the turn key if it's white's turn, if not, it's zero.
 	 */
-	if (board.turn == WHITE) {
+	if (board->turn == WHITE) {
 		key ^= randomKeys[TURN_OFFSET];
 	}
 
-	/*
-	 * As no hash table could have 2^64 entries, we return, at the risk of a collision, its index.
-	 */
 	return key;
 }
 
@@ -290,41 +287,41 @@ uint64_t zobristKey(Board board) {
  * This function takes the board after the move has been made.
  * It updates the boards key to the new one, saving steps from using the zobristKey function..
  */
-void updateBoardKey(Board *board, Move move, History history) {
-	const int color = move.color, opColor = 1 ^ color;
+void updateBoardKey(Board *board, const Move *move, const History *history) {
+	const int color = move->color, opColor = 1 ^ color;
 
 	int offset, castle;
 
-	board->key ^= randomKeys[getOffset(color, move.piece, move.from)];
+	board->key ^= randomKeys[getOffset(color, move->piece, move->from)];
 
-	if (history.enPassant) {
-		offset = ENPA_OFFSET + get_file(history.enPassant);
+	if (history->enPassant) {
+		offset = ENPA_OFFSET + get_file(history->enPassant);
 		board->key ^= randomKeys[offset];
 	}
 
-	switch (move.piece) {
+	switch (move->piece) {
 	case PAWN:
-		if (move.promotion) {
-			board->key ^= randomKeys[getOffset(color, move.promotion, move.to)];
+		if (move->promotion) {
+			board->key ^= randomKeys[getOffset(color, move->promotion, move->to)];
 		} else {
-			board->key ^= randomKeys[getOffset(color, PAWN, move.to)];
+			board->key ^= randomKeys[getOffset(color, PAWN, move->to)];
 		}
 
 		if (board->enPassant) {
 			offset = ENPA_OFFSET + get_file(board->enPassant);
 			board->key ^= randomKeys[offset];
-		} else if (history.enPassant && move.to == history.enPassant) {
-			board->key ^= randomKeys[getOffset(opColor, PAWN, move.to - 8 + 16*color)];
-		} else if (history.capture != -1) {
-			board->key ^= randomKeys[getOffset(opColor, history.capture, move.to)];
+		} else if (history->enPassant && move->to == history->enPassant) {
+			board->key ^= randomKeys[getOffset(opColor, PAWN, move->to - 8 + 16*color)];
+		} else if (history->capture != -1) {
+			board->key ^= randomKeys[getOffset(opColor, history->capture, move->to)];
 		}
 
 		break;
 	case KING:
-		updateCastleKey(board, history.castling, board->castling);
+		updateCastleKey(board, history->castling, board->castling);
 
-		if (move.castle != -1) {
-			castle = bitScanForward(move.castle);
+		if (move->castle != -1) {
+			castle = bitScanForward(move->castle);
 			board->key ^= randomKeys[getOffset(color, KING, castleLookup[castle][0])];
 			board->key ^= randomKeys[getOffset(color, ROOK, castleLookup[castle][1])];
 			board->key ^= randomKeys[getOffset(color, ROOK, castleLookup[castle][2])];
@@ -334,7 +331,7 @@ void updateBoardKey(Board *board, Move move, History history) {
 
 		break;
 	case ROOK:
-		updateCastleKey(board, history.castling, board->castling);
+		updateCastleKey(board, history->castling, board->castling);
 		defaultKeyChanges(board, move, history);
 		break;
 	default:
@@ -348,7 +345,7 @@ void updateBoardKey(Board *board, Move move, History history) {
  * Saves all the separate elements into a position.
  * Only the move is actually compressed.
  */
-Position compressPosition(uint64_t key, Move move, int score, int depth, int type) {
+Position compressPosition(uint64_t key, const Move *move, int score, int depth, int type) {
 	Position pos = (Position) {
 		.key   = key,
 		.score = score,
@@ -357,25 +354,25 @@ Position compressPosition(uint64_t key, Move move, int score, int depth, int typ
 	};
 
 	pos.move = (MoveCompressed) {
-		.from = move.from,
-		.to = move.to,
-		.promotion = move.promotion
+		.from = move->from,
+		.to = move->to,
+		.promotion = move->promotion
 	};
 
 	return pos;
 }
 
-Move decompressMove(Board board, MoveCompressed moveComp) {
+Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
 	int piece = PAWN, diff;
 	Move move;
 
-	move.from = moveComp.from;
-	move.to = moveComp.to;
-	move.promotion = moveComp.promotion;
+	move.from = moveComp->from;
+	move.to = moveComp->to;
+	move.promotion = moveComp->promotion;
 
-	move.color = (board.players[WHITE] & pow2[move.from]) ? WHITE : BLACK;
+	move.color = (board->players[WHITE] & pow2[move.from]) ? WHITE : BLACK;
 
-	while ((board.pieces[move.color][piece] & pow2[move.from]) == 0)
+	while ((board->pieces[move.color][piece] & pow2[move.from]) == 0)
 		++piece;
 
 	move.piece = piece;
@@ -385,6 +382,8 @@ Move decompressMove(Board board, MoveCompressed moveComp) {
 
 		if (abs(diff) == 2) {
 			move.castle =  (2 - (diff + 2) / 4) << 2*move.color;
+		} else {
+			move.castle = -1;
 		}
 	}
 
@@ -416,11 +415,11 @@ void updateCastleKey(Board *board, const int oldCast, const int newCast) {
  * Adds the moved piece to the moved position and
  * Removed the captured piece if there was one.
  */
-void defaultKeyChanges(Board *board, Move move, History history) {
-	const int color = move.color, opColor = 1 ^ color;
+void defaultKeyChanges(Board *board, const Move *move, const History *history) {
+	const int color = move->color, opColor = 1 ^ color;
 
-	board->key ^= randomKeys[getOffset(color, move.piece, move.to)];
+	board->key ^= randomKeys[getOffset(color, move->piece, move->to)];
 
-	if (history.capture != -1)
-		board->key ^= randomKeys[getOffset(opColor, history.capture, move.to)];
+	if (history->capture != -1)
+		board->key ^= randomKeys[getOffset(opColor, history->capture, move->to)];
 }

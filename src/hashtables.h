@@ -2,7 +2,7 @@
 #define SRC_HASHTABLES_H_
 
 
-#define HASHTABLE_MAX_SIZE 0x400000
+#define HASHTABLE_MAX_SIZE 0xf00000
 
 #define CAST_OFFSET 768
 #define ENPA_OFFSET 772
@@ -38,11 +38,11 @@ extern Position tt[HASHTABLE_MAX_SIZE];
 
 void initializeTT(void);
 
-uint64_t zobristKey(Board board);
-void updateBoardKey(Board *board, Move move, History history);
+uint64_t zobristKey(const Board *board);
+void updateBoardKey(Board *board, const Move *move, const History *history);
 
-Position compressPosition(const uint64_t key, const Move move, const int score, const int depth, const int type);
-Move decompressMove(Board board, MoveCompressed moveComp);
+Position compressPosition(const uint64_t key, const Move *move, const int score, const int depth, const int type);
+Move decompressMove(const Board *board, const MoveCompressed *moveComp);
 
 
 #endif /* SRC_HASHTABLES_H_ */

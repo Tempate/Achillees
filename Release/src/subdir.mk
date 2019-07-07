@@ -5,6 +5,7 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
 ../src/board.c \
+../src/draw.c \
 ../src/eval.c \
 ../src/hashtables.c \
 ../src/main.c \
@@ -16,6 +17,7 @@ C_SRCS += \
 
 OBJS += \
 ./src/board.o \
+./src/draw.o \
 ./src/eval.o \
 ./src/hashtables.o \
 ./src/main.o \
@@ -27,6 +29,7 @@ OBJS += \
 
 C_DEPS += \
 ./src/board.d \
+./src/draw.d \
 ./src/eval.d \
 ./src/hashtables.d \
 ./src/main.d \

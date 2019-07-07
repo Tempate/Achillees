@@ -9,7 +9,7 @@ void removeCastlingForRook(Board *board, int index, int color);
 const int castleLookup[4][3] = {{6, 7, 5}, {2, 0, 3}, {62, 63, 61}, {58, 56, 59}};
 
 
-long perft(Board board, const int depth) {
+long perft(Board *board, const int depth) {
 	Move moves[218];
 	History history;
 
@@ -23,9 +23,9 @@ long perft(Board board, const int depth) {
 		k = legalMoves(board, moves);
 
 		for (int i = 0; i < k; ++i) {
-			makeMove(&board, moves[i], &history);
+			makeMove(board, &moves[i], &history);
 			nodes += perft(board, newDepth);
-			undoMove(&board, moves[i], history);
+			undoMove(board, &moves[i], &history);
 		}
 	}
 
@@ -33,9 +33,9 @@ long perft(Board board, const int depth) {
 }
 
 
-void makeMove(Board *board, Move move, History *history) {
+void makeMove(Board *board, const Move *move, History *history) {
 	static const int removeCastling[2] = {12, 3};
-	const int color = move.color, opColor = 1 ^ color;
+	const int color = move->color, opColor = 1 ^ color;
 
 	int castle;
 
@@ -44,23 +44,23 @@ void makeMove(Board *board, Move move, History *history) {
 	history->fiftyMoves = board->fiftyMoves;
 	history->capture = -1;
 
-	unsetBits(board, color, move.piece, move.from);
+	unsetBits(board, color, move->piece, move->from);
 
-	switch (move.piece) {
+	switch (move->piece) {
 	case PAWN:
-		if (board->enPassant && move.to == board->enPassant) {
-			unsetBits(board, opColor, PAWN, move.to - 8 + 16*color);
-			setBits(board, color, PAWN, move.to);
-		} else if (move.promotion) {
-			setBits(board, color, move.promotion, move.to);
-			checkCapture(board, history, move.to, opColor);
+		if (board->enPassant && move->to == board->enPassant) {
+			unsetBits(board, opColor, PAWN, move->to - 8 + 16*color);
+			setBits(board, color, PAWN, move->to);
+		} else if (move->promotion) {
+			setBits(board, color, move->promotion, move->to);
+			checkCapture(board, history, move->to, opColor);
 		} else {
-			setBits(board, color, PAWN, move.to);
-			checkCapture(board, history, move.to, opColor);
+			setBits(board, color, PAWN, move->to);
+			checkCapture(board, history, move->to, opColor);
 		}
 
-		if (abs(move.to - move.from) == 16) {
-			board->enPassant = move.from + 8 - 16 * color;
+		if (abs(move->to - move->from) == 16) {
+			board->enPassant = move->from + 8 - 16 * color;
 		} else {
 			board->enPassant = 0;
 		}
@@ -71,26 +71,26 @@ void makeMove(Board *board, Move move, History *history) {
 	case KING:
 		board->castling &= removeCastling[color];	// WHITE: 1100   BLACK: 0011
 		board->enPassant = 0;
-		++(board->fiftyMoves);
 
-		if (move.castle != -1) {
-			castle = bitScanForward(move.castle);
+		if (move->castle != -1) {
+			++(board->fiftyMoves);
+			castle = bitScanForward(move->castle);
 			setBits  (board, color, KING, castleLookup[castle][0]);
 			unsetBits(board, color, ROOK, castleLookup[castle][1]);
 			setBits  (board, color, ROOK, castleLookup[castle][2]);
 		} else {
-			setBits(board, color, KING, move.to);
-			checkCapture(board, history, move.to, opColor);
+			setBits(board, color, KING, move->to);
+			checkCapture(board, history, move->to, opColor);
 		}
 
 		break;
 	case ROOK:
-		removeCastlingForRook(board, move.from, color);
+		removeCastlingForRook(board, move->from, color);
 		/* no break */
 	default:
 		board->enPassant = 0;
-		setBits(board, color, move.piece, move.to);
-		checkCapture(board, history, move.to, opColor);
+		setBits(board, color, move->piece, move->to);
+		checkCapture(board, history, move->to, opColor);
 	}
 
 	updateOccupancy(board);
@@ -99,34 +99,34 @@ void makeMove(Board *board, Move move, History *history) {
 	board->turn = 1 - board->turn;
 }
 
-void undoMove(Board *board, Move move, History history) {
-	const int color = move.color, opColor = 1 ^ color;
+void undoMove(Board *board, const Move *move, const History *history) {
+	const int color = move->color, opColor = 1 ^ color;
 	int castle;
 
-	board->castling = history.castling;
-	board->enPassant = history.enPassant;
-	board->fiftyMoves = history.fiftyMoves;
+	board->castling = history->castling;
+	board->enPassant = history->enPassant;
+	board->fiftyMoves = history->fiftyMoves;
 
-	setBits(board, color, move.piece, move.from);
+	setBits(board, color, move->piece, move->from);
 
-	switch (move.piece) {
+	switch (move->piece) {
 	case PAWN:
-		if (board->enPassant && move.to == board->enPassant) {
+		if (board->enPassant && move->to == board->enPassant) {
 			// Adds the pawn captured en passant
-			setBits(board, opColor, PAWN, move.to - 8 + 16*color);
-			unsetBits(board, color, PAWN, move.to);
+			setBits(board, opColor, PAWN, move->to - 8 + 16*color);
+			unsetBits(board, color, PAWN, move->to);
 			break;
-		} else if (move.promotion) {
+		} else if (move->promotion) {
 			// Removes the promoted piece
-			unsetBits(board, color, move.promotion, move.to);
+			unsetBits(board, color, move->promotion, move->to);
 			goto CAPTURE;
 		} else {
-			unsetBits(board, color, PAWN, move.to);
+			unsetBits(board, color, PAWN, move->to);
 			goto CAPTURE;
 		}
 	case KING:
-		if (move.castle != -1) {
-			castle = bitScanForward(move.castle);
+		if (move->castle != -1) {
+			castle = bitScanForward(move->castle);
 			unsetBits(board, color, KING, castleLookup[castle][0]);
 			setBits  (board, color, ROOK, castleLookup[castle][1]);
 			unsetBits(board, color, ROOK, castleLookup[castle][2]);
@@ -134,11 +134,11 @@ void undoMove(Board *board, Move move, History history) {
 		}
 		/* no break */
 	default:
-		unsetBits(board, color, move.piece, move.to);
+		unsetBits(board, color, move->piece, move->to);
 
 		CAPTURE:
-		if (history.capture != -1)
-			setBits(board, opColor, history.capture, move.to);
+		if (history->capture != -1)
+			setBits(board, opColor, history->capture, move->to);
 	}
 
 	updateOccupancy(board);
@@ -151,7 +151,7 @@ void checkCapture(Board *board, History *history, int index, int color) {
 	uint64_t toBB = pow2[index];
 
 	if (toBB & board->players[color]) {
-		history->capture = findPiece(*board, toBB, color);
+		history->capture = findPiece(board, toBB, color);
 		unsetBits(board, color, history->capture, index);
 
 		if (history->capture == ROOK)
@@ -163,9 +163,9 @@ void checkCapture(Board *board, History *history, int index, int color) {
 	}
 }
 
-int findPiece(Board board, uint64_t toBB, int color) {
+int findPiece(const Board *board, uint64_t toBB, int color) {
 	for (int i = 0; i < PIECES; ++i) {
-		if (toBB & board.pieces[color][i])
+		if (toBB & board->pieces[color][i])
 			return i;
 	}
 
