@@ -31,10 +31,11 @@ static inline int  popCount       (uint64_t bb)  { return __builtin_popcountll(b
 static inline int  bitScanForward (uint64_t bb)  { return __builtin_ctzll(bb); }
 static inline int  bitScanReverse (uint64_t bb)  { return 63 - __builtin_clzll(bb); }
 
+static inline int  sameParity(const int a, const int b) { return ((a ^ b) & 1) == 0; }
 
 Board blankBoard();
 
-void printBoard(Board board);
+void printBoard(const Board *board);
 void updateBoard(Board *board);
 void updateOccupancy(Board *board);
 
@@ -44,10 +45,10 @@ void unsetBits(Board *board, const int color, const int piece, const int index);
 void printMoves(Move *moves, int n);
 void printMove (Move move, int nodes);
 void moveToText(Move move, char *text);
-Move textToMove(Board board, char *text);
+Move textToMove(const Board *board, char *text);
 
 int parseFen(Board *board, char *fen);
-void generateFen(Board board, char *fen);
+void generateFen(const Board *board, char *fen);
 
 void printBB(const uint64_t bb);
 int mirrorLSB(const uint64_t bb);

@@ -8,26 +8,28 @@
 
 
 void testMakeMove(char *fen) {
-	Board board;
+	Board *board = malloc(sizeof(Board));
 	Move moves[218];
 	History history;
 
-	parseFen(&board, fen);
+	parseFen(board, fen);
 
 	int n = legalMoves(board, moves);
 
 	printBoard(board);
 
 	for (int i = 0; i < n; i++) {
-		makeMove(&board, moves[i], &history);
+		makeMove(board, &moves[i], &history);
 		printBoard(board);
-		undoMove(&board, moves[i], history);
+		undoMove(board, &moves[i], &history);
 	}
+
+	free(board);
 }
 
 void testMoves(char *fen, const int depth) {
-	Move *moves = malloc(218 * sizeof(Move));
-	Board board;
+	Board *board = malloc(sizeof(Board));
+	Move moves[218];
 	History history;
 
 	const int newDepth = depth - 1;
@@ -35,13 +37,13 @@ void testMoves(char *fen, const int depth) {
 
 	time_t start = clock();
 
-	parseFen(&board, fen);
+	parseFen(board, fen);
 	printBoard(board);
 
 	k = legalMoves(board, moves);
 
 	for (int i = 0; i < k; i++) {
-		makeMove(&board, moves[i], &history);
+		makeMove(board, &moves[i], &history);
 
 		if (newDepth > 0) {
 			r = perft(board, newDepth);
@@ -51,7 +53,7 @@ void testMoves(char *fen, const int depth) {
 			printMove(moves[i], 0);
 		}
 
-		undoMove(&board, moves[i], history);
+		undoMove(board, &moves[i], &history);
 	}
 
 	printf("\n");
@@ -59,7 +61,7 @@ void testMoves(char *fen, const int depth) {
 	printf("Moves: %d\n", k);
 	printf("Nodes: %d\n", s);
 
-	free(moves);
+	free(board);
 }
 
 
@@ -96,7 +98,7 @@ void testPerft(const char* filename, const int depth) {
 			printf(" ");
 
 		parseFen(&board, fen);
-		k = perft(board, depth);
+		k = perft(&board, depth);
 
 		printf("%ld \t %d", nodes, k);
 
@@ -122,25 +124,25 @@ void testKeys(void) {
 	parseFen(board1, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK2R w KQkq -");
 	parseFen(board2, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK1R1 b Qkq -");
 
-	move = textToMove(*board1, "h1g1");
+	move = textToMove(board1, "h1g1");
 
 	printf("%" PRIu64 "\n", board1->key);
-	printBoard(*board1);
+	printBoard(board1);
 
 	printf("%" PRIu64 "\n", board2->key);
-	printBoard(*board2);
+	printBoard(board2);
 
-	makeMove(board1, move, &history);
-	updateBoardKey(board1, move, history);
-
-	printf("%" PRIu64 "\n", board1->key);
-	printBoard(*board1);
-
-	updateBoardKey(board1, move, history);
-	undoMove(board1, move, history);
+	makeMove      (board1, &move, &history);
+	updateBoardKey(board1, &move, &history);
 
 	printf("%" PRIu64 "\n", board1->key);
-	printBoard(*board1);
+	printBoard(board1);
+
+	updateBoardKey(board1, &move, &history);
+	undoMove      (board1, &move, &history);
+
+	printf("%" PRIu64 "\n", board1->key);
+	printBoard(board1);
 
 	free(board1);
 	free(board2);

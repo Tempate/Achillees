@@ -1,5 +1,6 @@
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 
 #include "main.h"
 #include "board.h"
@@ -31,7 +32,7 @@ Board blankBoard() {
 	return board;
 }
 
-void printBoard(Board board) {
+void printBoard(const Board *board) {
 	uint64_t bb;
 	int color;
 
@@ -39,12 +40,12 @@ void printBoard(Board board) {
 		for (int x = 0; x < FILES; x++) {
 			bb = get_sqr(x,y);
 
-			if (board.empty & bb) {
+			if (board->empty & bb) {
 				printf(". ");
 			} else {
-				color = (board.players[WHITE] & bb) ? WHITE : BLACK;
+				color = (board->players[WHITE] & bb) ? WHITE : BLACK;
 				for (int j = 0; j < PIECES; j++) {
-					if (board.pieces[color][j] & bb) {
+					if (board->pieces[color][j] & bb) {
 						printf("%c ", pieceChars[j + 6*color]);
 						break;
 					}
@@ -56,22 +57,22 @@ void printBoard(Board board) {
 	}
 
 	printf("\n");
-	printf("Turn: %s\n", (board.turn == WHITE) ? "White" : "Black");
+	printf("Turn: %s\n", (board->turn == WHITE) ? "White" : "Black");
 	printf("Castling: ");
 
-	if (board.castling) {
-		if (board.castling & KCastle) printf("K");
-		if (board.castling & QCastle) printf("Q");
-		if (board.castling & kCastle) printf("k");
-		if (board.castling & qCastle) printf("q");
+	if (board->castling) {
+		if (board->castling & KCastle) printf("K");
+		if (board->castling & QCastle) printf("Q");
+		if (board->castling & kCastle) printf("k");
+		if (board->castling & qCastle) printf("q");
 	} else {
 		printf("-");
 	}
 
 	printf("\n");
-	printf("En passant: %s\n", (board.enPassant > 0) ? sqToCoord(board.enPassant) : "-");
-	printf("Fifty Moves: %d\n", board.fiftyMoves);
-	printf("Ply: %d\n\n", board.ply);
+	printf("En passant: %s\n", (board->enPassant > 0) ? sqToCoord(board->enPassant) : "-");
+	printf("Fifty Moves: %d\n", board->fiftyMoves);
+	printf("Ply: %d\n\n", board->ply);
 }
 
 void updateBoard(Board *board) {
@@ -81,9 +82,9 @@ void updateBoard(Board *board) {
 			board->pieces[WHITE][QUEEN]  | board->pieces[WHITE][KING];
 
 	board->players[BLACK] =
-				board->pieces[BLACK][PAWN]   | board->pieces[BLACK][KNIGHT] |
-				board->pieces[BLACK][BISHOP] | board->pieces[BLACK][ROOK] |
-				board->pieces[BLACK][QUEEN]  | board->pieces[BLACK][KING];
+			board->pieces[BLACK][PAWN]   | board->pieces[BLACK][KNIGHT] |
+			board->pieces[BLACK][BISHOP] | board->pieces[BLACK][ROOK] |
+			board->pieces[BLACK][QUEEN]  | board->pieces[BLACK][KING];
 
 	updateOccupancy(board);
 }
@@ -131,7 +132,6 @@ void printMove(Move move, int nodes) {
 	}
 
 	free(text);
-
 }
 
 void moveToText(Move move, char *text) {
@@ -145,7 +145,7 @@ void moveToText(Move move, char *text) {
 	}
 }
 
-Move textToMove(Board board, char *text) {
+Move textToMove(const Board *board, char *text) {
 	Move move;
 	uint64_t fromBB;
 
@@ -155,7 +155,7 @@ Move textToMove(Board board, char *text) {
 	move.to = coordToSq(text + 2);
 
 	fromBB = pow2[move.from];
-	move.color = (fromBB & board.players[WHITE]) ? WHITE : BLACK;
+	move.color = (fromBB & board->players[WHITE]) ? WHITE : BLACK;
 
 	if (text[4] >= 'a' && text[4] <= 'z') {
 		move.piece = PAWN;
@@ -234,21 +234,33 @@ int parseFen(Board *board, char *fen) {
 	}
 
 	i += 2;
-	if (fen[i] >= '0' && fen[i] <= '9') {
-		board->fiftyMoves = fen[i] - '0';
 
-		i += 2;
-		board->ply = fen[i] - '0';
+
+	board->fiftyMoves = 0;
+
+	if (fen[i] >= '0' && fen[i] <= '9') {
+		board->ply = 0;
+
+		while (fen[i] >= '0' && fen[i] <= '9') {
+			board->fiftyMoves *= 10;
+			board->fiftyMoves += fen[i] - '0';
+			++i;
+		}
 
 		++i;
+
+		while (fen[i] >= '0' && fen[i] <= '9') {
+			board->ply *= 10;
+			board->ply += fen[i] - '0';
+			++i;
+		}
 	} else {
-		board->fiftyMoves = 0;
 		board->ply = 1;
 
 		--i;
 	}
 
-	board->key = zobristKey(*board);
+	board->key = zobristKey(board);
 
 	updateBoard(board);
 	initializeTT();
@@ -256,7 +268,7 @@ int parseFen(Board *board, char *fen) {
 	return i;
 }
 
-void generateFen(Board board, char *fen) {
+void generateFen(const Board *board, char *fen) {
 	uint64_t sqr;
 	int k = -1, blanks;
 
@@ -266,57 +278,63 @@ void generateFen(Board board, char *fen) {
 		for (int x = 0; x < FILES; x++) {
 			sqr = get_sqr(x,y);
 
-			if (board.empty & sqr) {
+			if (board->empty & sqr) {
 				++blanks;
 			} else {
-				if (blanks > 0)
-					fen[++k] = blanks;
+				if (blanks > 0) {
+					fen[++k] = blanks + '0';
+					blanks = 0;
+				}
 
 				for (int i = 0; i < PIECES; ++i) {
-					if (board.pieces[WHITE][i] & sqr) {
+					if (board->pieces[WHITE][i] & sqr) {
 						fen[++k] = pieceChars[i];
 						break;
-					} else if (board.pieces[BLACK][i] & sqr) {
-						fen[++k] = pieceChars[i+6];
+					} else if (board->pieces[BLACK][i] & sqr) {
+						fen[++k] = pieceChars[i + 6];
 						break;
 					}
 				}
 			}
 		}
 
-		if (blanks > 0)
+		if (blanks > 0) {
 			fen[++k] = blanks + '0';
+			blanks = 0;
+		}
 
 		if (y != 0)
 			fen[++k] = '/';
 	}
 
 	fen[++k] = ' ';
-	fen[++k] = (board.turn == WHITE) ? 'w' : 'b';
+	fen[++k] = (board->turn == WHITE) ? 'w' : 'b';
 	fen[++k] = ' ';
 
-	if (board.castling == 0) {
+	if (board->castling == -1) {
 		fen[++k] = '-';
 	} else {
-		if (board.castling & pow2[0]) fen[++k] = 'K';
-		if (board.castling & pow2[1]) fen[++k] = 'Q';
-		if (board.castling & pow2[2]) fen[++k] = 'k';
-		if (board.castling & pow2[3]) fen[++k] = 'q';
+		if (board->castling & pow2[0]) fen[++k] = 'K';
+		if (board->castling & pow2[1]) fen[++k] = 'Q';
+		if (board->castling & pow2[2]) fen[++k] = 'k';
+		if (board->castling & pow2[3]) fen[++k] = 'q';
 	}
 
 	fen[++k] = ' ';
-	if (board.enPassant == -1) {
+	if (board->enPassant == 0) {
 		fen[++k] = '-';
 	} else {
-		fen[++k] = get_file(board.enPassant) + 'a';
-		fen[++k] = get_rank(board.enPassant) + '1';
+		fen[++k] = get_file(board->enPassant) + 'a';
+		fen[++k] = get_rank(board->enPassant) + '1';
 	}
 
+	/*
 	fen[++k] = ' ';
-	fen[++k] = board.fiftyMoves + '0';
+	fen[++k] = board->fiftyMoves + '0';
 
 	fen[++k] = ' ';
-	fen[++k] = board.ply + '0';
+	fen[++k] = board->ply + '0';
+	*/
 
 	fen[++k] = '\0';
 }

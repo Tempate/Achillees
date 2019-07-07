@@ -11,6 +11,8 @@ typedef struct {
 
 	int castle;
 	int promotion;
+
+	int score;
 } Move;
 
 typedef struct {
@@ -20,8 +22,8 @@ typedef struct {
 	int fiftyMoves;
 } History;
 
-int legalMoves(Board board, Move *moves);
-int kingInCheck(Board board, uint64_t kingBB, int color);
+int legalMoves(Board *board, Move *moves);
+int kingInCheck(const Board *board, uint64_t kingBB, int color);
 
 const uint64_t kingMoves(int index);
 
