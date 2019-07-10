@@ -59,6 +59,22 @@ static int pseudoLegalMoves(const Board *board, Move *moves) {
 	return n;
 }
 
+int isLegalMove(Board *board, const Move *move) {
+	Move moves[218];
+	const int nMoves = legalMoves(board, moves);
+
+	for (int i = 0; i < nMoves; ++i) {
+		if (compareMoves(&moves[i], move))
+			return 1;
+	}
+
+	return 0;
+}
+
+int inCheck(const Board *board) {
+	return kingInCheck(board, board->pieces[board->turn][KING], board->turn);
+}
+
 /*
  * Attacks from a certain position as if it was any piece.
  * Returns 1 if in check and 0 otherwise
@@ -225,7 +241,7 @@ static void kingPseudoLegalMoves(const Board *board, Move *moves, int *n) {
 	 * 		- The squares the king passes by are free.
 	 */
 
-	if (kingInCheck(board, bb, color) == 0) {
+	if (inCheck(board) == 0) {
 		kingCastle = 2*color, queenCastle = kingCastle + 1;
 
 		castle = board->castling & pow2[kingCastle];
@@ -316,4 +332,9 @@ static uint64_t rayAttacks(int index, uint64_t occupied, uint64_t myPieces, int 
 	}
 
 	return moves;
+}
+
+
+int compareMoves(const Move *moveA, const Move *moveB) {
+	return moveA->from == moveB->from && moveA->to == moveB->to && moveA->promotion == moveB->promotion;
 }
