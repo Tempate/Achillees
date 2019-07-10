@@ -1,53 +1,51 @@
 #include <assert.h>
 #include <time.h>
+#include <string.h>
 
 #include "board.h"
+#include "uci.h"
+#include "moves.h"
 #include "play.h"
+#include "draw.h"
 #include "eval.h"
 #include "search.h"
 #include "hashtables.h"
-#include "uci.h"
-#include "draw.h"
 
 
-static int alphabeta(Board *board, const int depth, int alpha, const int beta);
+static int alphabeta(Board *board, const int depth, int alpha, int beta);
+static PV generatePV(Board board);
 
 static void timeManagement(const Board *board);
 
 static void evaluateMoves(const Board *board, Move *moves, const int nMoves, const int depth);
-static void updatePV(Board board, Move *pv, const int depth);
 
-static int moveScore(const int victim);
-static int compareMoves(const void *moveA, const void *moveB);
+static int moveScore(const int victim, const int attacker);
+static int compareMovesScore(const void *moveA, const void *moveB);
 
 clock_t start;
 uint64_t nodes;
 
-Move pv[MAX_DEPTH];
-
 Move search(Board *board) {
 	Move bestMove;
-	char moveText[6];
 
 	timeManagement(board);
 	start = clock();
 
-	nodes = 0;
+	const int index = board->key % HASHTABLE_MAX_SIZE;
 
 	for (int depth = 1; depth <= settings.depth; ++depth) {
+		nodes = 0;
+
 		const int score = alphabeta(board, depth, -2 * MAX_SCORE, 2 * MAX_SCORE);
 
 		if (settings.stop) break;
 
-		updatePV(*board, &pv[0], depth);
-		bestMove = pv[depth - 1];
+		bestMove = decompressMove(board, &tt[index].move);
 
-		moveToText(bestMove, moveText);
+		PV pv = generatePV(*board);
+		bestMove = pv.moves[0];
 
-		fprintf(stdout, "info score cp %d depth %d pv %s nodes %ld\n", score, depth, moveText, nodes);
-		fflush(stdout);
-
-		nodes = 0;
+		infoString(board, &pv, score, depth, nodes);
 	}
 
 	return bestMove;
@@ -59,7 +57,7 @@ Move search(Board *board) {
  * alpha is the value to maximize and beta the value to minimize.
  * The initial position must have >= 1 legal moves and the initial depth must be >= 1.
  */
-static int alphabeta(Board *board, const int depth, int alpha, const int beta) {
+static int alphabeta(Board *board, const int depth, int alpha, int beta) {
 	if (settings.stop)
 		return 0;
 
@@ -75,23 +73,37 @@ static int alphabeta(Board *board, const int depth, int alpha, const int beta) {
 
 	const int index = board->key % HASHTABLE_MAX_SIZE;
 
-	// Uses the entry on the TT if one is found
+	// Transposition Table
 	if (tt[index].key == board->key && tt[index].depth >= depth) {
-		switch (tt[index].type) {
+		switch (tt[index].flag) {
 		case LOWER_BOUND:
-			if (tt[index].score >= beta) {
-				return tt[index].score;
-			}
+			alpha = (alpha > tt[index].score) ? alpha : tt[index].score;
 			break;
-		case HIGHER_BOUND:
-			if (tt[index].score <= alpha) {
-				return tt[index].score;
-			}
+		case UPPER_BOUND:
+			beta = (beta < tt[index].score) ? beta : tt[index].score;
 			break;
 		case EXACT:
 			return tt[index].score;
 		}
+
+		if (alpha >= beta)
+			return tt[index].score;
 	}
+
+	History history;
+
+	/* Null Move Pruning
+	if (depth > 2 && !inCheck(board)) {
+		makeNullMove(board, &history);
+
+		const int score = -alphabeta(board, depth-1 - R, -beta, -alpha);
+
+		undoNullMove(board, &history);
+
+		if (score >= beta)
+			return score;
+	}
+	*/
 
 	Move moves[218];
 	const int nMoves = legalMoves(board, moves);
@@ -100,16 +112,16 @@ static int alphabeta(Board *board, const int depth, int alpha, const int beta) {
 	if (nMoves == 0)
 		return finalEval(board, depth);
 
+	// Move ordering
 	evaluateMoves(board, moves, nMoves, depth);
-	qsort(moves, nMoves, sizeof(Move), compareMoves);
+	qsort(moves, nMoves, sizeof(Move), compareMovesScore);
 
 	Move bestMove = moves[0];
 	int bestScore = -2 * MAX_SCORE;
-	int type = LOWER_BOUND;
+
+	const int originalAlpha = alpha, originalBeta = beta;
 
 	for (int i = 0; i < nMoves; ++i) {
-		History history;
-
 		makeMove(board, &moves[i], &history);
 		updateBoardKey(board, &moves[i], &history);
 		saveKeyToMemory(board->key);
@@ -133,17 +145,22 @@ static int alphabeta(Board *board, const int depth, int alpha, const int beta) {
 
 			if (bestScore > alpha) {
 				alpha = bestScore;
-				type = EXACT;
 
-				if (alpha >= beta) {
-					type = HIGHER_BOUND;
+				if (alpha >= beta)
 					break;
-				}
 			}
 		}
 	}
 
-	tt[index] = compressPosition(board->key, &bestMove, bestScore, depth, type);
+	int flag = EXACT;
+
+	if (bestScore <= originalAlpha) {
+		flag = UPPER_BOUND;
+	} else if (bestScore >= originalBeta) {
+		flag = LOWER_BOUND;
+	}
+
+	tt[index] = compressEntry(board->key, &bestMove, bestScore, depth, flag);
 
 	return bestScore;
 }
@@ -159,24 +176,18 @@ static void timeManagement(const Board *board) {
 }
 
 /*
- * Assigns a score to each move:
- * 	 1. Best move from the principal variation
- * 	 2. Most valuable victim
+ * Assigns each move a score via the MVV-LVA technique.
  */
 static void evaluateMoves(const Board *board, Move *moves, const int nMoves, const int depth) {
 	const int opColor = 1 ^ board->turn;
-	const Move pvMove = pv[depth - 2];
 
 	for (int i = 0; i < nMoves; ++i) {
 		const uint64_t toBB = pow2[moves[i].to];
 
-		if (depth >= 2 && moves[i].from == pvMove.from && moves[i].to == pvMove.to && moves[i].promotion == pvMove.promotion) {
-			moves[i].score = 30000 - depth;
-		} else if (moves[i].score == 0 && (toBB & board->players[opColor])) {
-			// Most valuable victim
+		if (moves[i].score == 0 && (toBB & board->players[opColor])) {
 			for (int piece = PAWN; piece <= QUEEN; ++piece) {
 				if (toBB & board->pieces[opColor][piece]) {
-					moves[i].score = moveScore(piece);
+					moves[i].score = moveScore(piece, moves[i].piece);
 					break;
 				}
 			}
@@ -184,32 +195,49 @@ static void evaluateMoves(const Board *board, Move *moves, const int nMoves, con
 	}
 }
 
-static void updatePV(Board board, Move *pv, const int depth) {
-	for (int i = depth - 1; i >= 0; --i) {
-		History history;
+static int moveScore(const int victim, const int attacker) {
+	static const int pieceValues[6] = {100,200,200,300,400,500};
 
-		const int index = board.key % HASHTABLE_MAX_SIZE;
-		Move move = decompressMove(&board, &tt[index].move);
-
-		pv[i] = move;
-
-		makeMove(&board, &move, &history);
-		updateBoardKey(&board, &move, &history);
-	}
+	return pieceValues[victim] - pieceValues[attacker] / 10;
 }
 
 /*
- * MVV-LVA would need to take into account the value of the attacker.
- * However, this is already done in the move generator, so it can be omitted here.
+ *	Generates the PV line out of the moves from the TT.
  */
-static int moveScore(const int victim) {
-	static const int pieceValues[6] = {100,200,200,300,400};
+static PV generatePV(Board board) {
+	PV pv = (PV) {.count = 0};
 
-	assert(victim != KING);
+	while (1) {
+		const int index = board.key % HASHTABLE_MAX_SIZE;
 
-	return pieceValues[victim];
+		if (board.key != tt[index].key)
+			break;
+
+		const Move move = decompressMove(&board, &tt[index].move);
+
+		if (!isLegalMove(&board, &move))
+			break;
+
+		// Avoids getting into an infinite loop
+		for (int i = 0; i < pv.count; ++i) {
+			if (compareMoves(&pv.moves[i], &move))
+				return pv;
+		}
+
+		pv.moves[pv.count] = move;
+		++pv.count;
+
+		History history;
+		makeMove(&board, &move, &history);
+		updateBoardKey(&board, &move, &history);
+	}
+
+	return pv;
 }
 
-static int compareMoves(const void *moveA, const void *moveB) {
+
+// AUX
+
+static int compareMovesScore(const void *moveA, const void *moveB) {
 	return ((Move *) moveB)->score - ((Move *) moveA)->score;
 }

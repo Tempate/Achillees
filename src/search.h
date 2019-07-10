@@ -4,7 +4,14 @@
 #define MAX_DEPTH 50
 #define DEF_DEPTH 5
 
-enum {EXACT, HIGHER_BOUND, LOWER_BOUND};
+#define R 2
+
+enum {EXACT, UPPER_BOUND, LOWER_BOUND};
+
+typedef struct {
+	Move moves[MAX_DEPTH];
+	int count;
+} PV;
 
 Move search(Board *board);
 
