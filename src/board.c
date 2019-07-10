@@ -72,7 +72,7 @@ void printBoard(const Board *board) {
 	printf("\n");
 	printf("En passant: %s\n", (board->enPassant > 0) ? sqToCoord(board->enPassant) : "-");
 	printf("Fifty Moves: %d\n", board->fiftyMoves);
-	printf("Ply: %d\n\n", board->ply);
+	printf("Ply: %d\n\n", board->ply);;
 }
 
 void updateBoard(Board *board) {

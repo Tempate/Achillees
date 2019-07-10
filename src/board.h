@@ -2,10 +2,25 @@
 #define BOARD_H_
 
 #include "main.h"
-#include "moves.h"
 
 #define unsetLSB(bb) bb &= bb - 1
 
+typedef struct {
+	uint64_t pieces[2][6];
+	uint64_t players[2];
+
+	uint64_t empty;
+	uint64_t occupied;
+
+	uint64_t key;
+
+	int turn;
+	int castling;
+	int enPassant;
+
+	int fiftyMoves;
+	int ply;
+} Board;
 
 static const uint64_t notAFile = 0xfefefefefefefefe; // ~0x0101010101010101
 static const uint64_t notHFile = 0x7f7f7f7f7f7f7f7f; // ~0x8080808080808080
@@ -32,6 +47,8 @@ static inline int  bitScanForward (uint64_t bb)  { return __builtin_ctzll(bb); }
 static inline int  bitScanReverse (uint64_t bb)  { return 63 - __builtin_clzll(bb); }
 
 static inline int  sameParity(const int a, const int b) { return ((a ^ b) & 1) == 0; }
+
+#include "moves.h"
 
 Board blankBoard();
 
