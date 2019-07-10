@@ -5,13 +5,13 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#include "main.h"
 #include "board.h"
 #include "play.h"
 #include "search.h"
 #include "eval.h"
 #include "hashtables.h"
 #include "uci.h"
+#include "draw.h"
 
 
 static void uci(void);
@@ -134,8 +134,9 @@ static void position(Board *board, char *s) {
 			move = textToMove(board, moveText);
 			makeMove(board, &move, &history);
 			updateBoardKey(board, &move, &history);
+			saveKeyToMemory(board->key);
 
-			// assert(board->key == zobristKey(*board));
+			assert(board->key == zobristKey(board));
 		}
 	}
 }
@@ -203,6 +204,19 @@ static void evalCmd(const Board *board) {
 		score = -score;
 
 	fprintf(stdout, "%d\n", score);
+	fflush(stdout);
+}
+
+void infoString(const Board *board, PV *pv, const int score, const int depth, const uint64_t nodes) {
+	fprintf(stdout, "info score cp %d depth %d nodes %ld pv ", score, depth, nodes);
+
+	for (int i = 0; i < pv->count; ++i) {
+		char moveText[6];
+		moveToText(pv->moves[i], moveText);
+		fprintf(stdout, "%s ", moveText);
+	}
+
+	fprintf(stdout, "\n");
 	fflush(stdout);
 }
 
