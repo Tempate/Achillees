@@ -10,7 +10,7 @@ void defaultKeyChanges(Board *board, const Move *move, const History *history);
 
 
 // Transposition/Refutation Table
-Position tt[HASHTABLE_MAX_SIZE];
+Entry tt[HASHTABLE_MAX_SIZE];
 
 /*
  * This table has been taken from: http://hardy.uhasselt.be/Toga/book_format.html
@@ -220,7 +220,7 @@ static const uint64_t randomKeys[781] = {
 
 void initializeTT(void) {
 	for (int i = 0; i < HASHTABLE_MAX_SIZE; ++i) {
-		tt[i] = (Position) {.key=0};
+		tt[i] = (Entry) {.key = 0, .depth = 0};
 	}
 }
 
@@ -299,6 +299,8 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 		board->key ^= randomKeys[offset];
 	}
 
+	updateCastleKey(board, history->castling, board->castling);
+
 	switch (move->piece) {
 	case PAWN:
 		if (move->promotion) {
@@ -318,8 +320,6 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 
 		break;
 	case KING:
-		updateCastleKey(board, history->castling, board->castling);
-
 		if (move->castle != -1) {
 			castle = bitScanForward(move->castle);
 			board->key ^= randomKeys[getOffset(color, KING, castleLookup[castle][0])];
@@ -330,10 +330,6 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 		}
 
 		break;
-	case ROOK:
-		updateCastleKey(board, history->castling, board->castling);
-		defaultKeyChanges(board, move, history);
-		break;
 	default:
 		defaultKeyChanges(board, move, history);
 	}
@@ -341,16 +337,20 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 	board->key ^= randomKeys[TURN_OFFSET];
 }
 
+void updateNullMoveKey(Board *board) {
+	board->key ^= randomKeys[TURN_OFFSET];
+}
+
 /*
  * Saves all the separate elements into a position.
  * Only the move is actually compressed.
  */
-Position compressPosition(uint64_t key, const Move *move, int score, int depth, int type) {
-	Position pos = (Position) {
+Entry compressEntry(uint64_t key, const Move *move, int score, int depth, int flag) {
+	Entry pos = (Entry) {
 		.key   = key,
 		.score = score,
 		.depth = depth,
-		.type  = type
+		.flag  = flag
 	};
 
 	pos.move = (MoveCompressed) {
@@ -363,7 +363,6 @@ Position compressPosition(uint64_t key, const Move *move, int score, int depth, 
 }
 
 Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
-	int piece = PAWN, diff;
 	Move move;
 
 	move.from = moveComp->from;
@@ -372,18 +371,37 @@ Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
 
 	move.color = (board->players[WHITE] & pow2[move.from]) ? WHITE : BLACK;
 
+	int piece = PAWN;
+
 	while ((board->pieces[move.color][piece] & pow2[move.from]) == 0)
 		++piece;
 
 	move.piece = piece;
 
 	if (piece == KING) {
-		diff = move.to - move.from;
+		move.castle = -1;
 
-		if (abs(diff) == 2) {
-			move.castle =  (2 - (diff + 2) / 4) << 2*move.color;
-		} else {
-			move.castle = -1;
+		switch (move.from) {
+		case 4:
+			switch (move.to) {
+			case 6:
+				move.castle = KCastle;
+				break;
+			case 2:
+				move.castle = QCastle;
+				break;
+			}
+			break;
+		case 60:
+			switch (move.to) {
+			case 62:
+				move.castle = kCastle;
+				break;
+			case 58:
+				move.castle = qCastle;
+				break;
+			}
+			break;
 		}
 	}
 

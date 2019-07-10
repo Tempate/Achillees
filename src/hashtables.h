@@ -26,22 +26,24 @@ typedef struct {
 
 	int16_t score;
 	uint8_t depth;
-	uint8_t type : 2;
+	uint8_t flag : 2;
 
 	//TODO: age
-} Position;
+} Entry;
 
 
 // Transposition/Refutation Table
-extern Position tt[HASHTABLE_MAX_SIZE];
+extern Entry tt[HASHTABLE_MAX_SIZE];
 
 
 void initializeTT(void);
 
 uint64_t zobristKey(const Board *board);
-void updateBoardKey(Board *board, const Move *move, const History *history);
 
-Position compressPosition(const uint64_t key, const Move *move, const int score, const int depth, const int type);
+void updateBoardKey(Board *board, const Move *move, const History *history);
+void updateNullMoveKey(Board *board);
+
+Entry compressEntry(const uint64_t key, const Move *move, const int score, const int depth, const int flag);
 Move decompressMove(const Board *board, const MoveCompressed *moveComp);
 
 
