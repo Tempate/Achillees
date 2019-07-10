@@ -1,4 +1,3 @@
-#include "main.h"
 #include "board.h"
 #include "draw.h"
 
