@@ -144,7 +144,25 @@ void undoMove(Board *board, const Move *move, const History *history) {
 	updateOccupancy(board);
 
 	--(board->ply);
-	board->turn = 1 - board->turn;
+	board->turn ^= 1;
+}
+
+void makeNullMove(Board *board, History *history) {
+	history->fiftyMoves = board->fiftyMoves;
+	history->enPassant  = board->enPassant;
+
+	board->turn ^= 1;
+
+	updateNullMoveKey(board);
+}
+
+void undoNullMove(Board *board, History *history) {
+	board->fiftyMoves = history->fiftyMoves;
+	board->enPassant  = history->enPassant;
+
+	updateNullMoveKey(board);
+
+	board->turn ^= 1;
 }
 
 void checkCapture(Board *board, History *history, int index, int color) {
