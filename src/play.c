@@ -96,7 +96,7 @@ void makeMove(Board *board, const Move *move, History *history) {
 	updateOccupancy(board);
 
 	++(board->ply);
-	board->turn = 1 - board->turn;
+	board->turn ^= 1;
 }
 
 void undoMove(Board *board, const Move *move, const History *history) {
@@ -151,6 +151,9 @@ void makeNullMove(Board *board, History *history) {
 	history->fiftyMoves = board->fiftyMoves;
 	history->enPassant  = board->enPassant;
 
+	board->fiftyMoves = 0;
+	board->enPassant = 0;
+
 	board->turn ^= 1;
 
 	updateNullMoveKey(board);
@@ -160,9 +163,9 @@ void undoNullMove(Board *board, History *history) {
 	board->fiftyMoves = history->fiftyMoves;
 	board->enPassant  = history->enPassant;
 
-	updateNullMoveKey(board);
-
 	board->turn ^= 1;
+
+	updateNullMoveKey(board);
 }
 
 void checkCapture(Board *board, History *history, int index, int color) {
@@ -182,9 +185,9 @@ void checkCapture(Board *board, History *history, int index, int color) {
 }
 
 int findPiece(const Board *board, uint64_t toBB, int color) {
-	for (int i = 0; i < PIECES; ++i) {
-		if (toBB & board->pieces[color][i])
-			return i;
+	for (int piece = PAWN; piece < PIECES; ++piece) {
+		if (toBB & board->pieces[color][piece])
+			return piece;
 	}
 
 	return -1;
