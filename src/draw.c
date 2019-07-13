@@ -8,13 +8,13 @@ static int insufficientMaterial(const Board *board);
 Memory memory = (Memory) { .size = 0 };
 
 int isDraw(const Board *board) {
-	if (board->fiftyMoves >= 100)
-		return 1;
-
 	if (threeFoldRepetition(board))
 		return 1;
 
 	if (insufficientMaterial(board))
+		return 1;
+
+	if (board->fiftyMoves >= 100)
 		return 1;
 
 	return 0;
@@ -34,29 +34,29 @@ static int insufficientMaterial(const Board *board) {
 		case 1:
 			return 1;
 		case 2:
-			if (popCount(board->pieces[BLACK][KNIGHT]) || popCount(board->pieces[BLACK][BISHOP]))
+			if (board->pieces[BLACK][KNIGHT] || board->pieces[BLACK][BISHOP])
 				return 1;
 			return 0;
 		}
-		return 0;
+		break;
 	case 2:
 		switch (popCount(board->players[BLACK])) {
 		case 1:
-			if (popCount(board->pieces[WHITE][KNIGHT]) || popCount(board->pieces[WHITE][BISHOP]))
+			if (board->pieces[WHITE][KNIGHT] || board->pieces[WHITE][BISHOP])
 				return 1;
 			break;
 		case 2:
-			if 	(popCount(board->pieces[WHITE][BISHOP]) == 1 &&
-				 popCount(board->pieces[BLACK][BISHOP]) == 1 &&
+			if 	(board->pieces[WHITE][BISHOP] &&
+				 board->pieces[BLACK][BISHOP] &&
 				 sameParity(
 						bitScanForward(board->pieces[WHITE][BISHOP]),
 						bitScanForward(board->pieces[BLACK][BISHOP])))
 			{
 				return 1;
 			}
-			return 0;
+			break;
 		}
-		return 0;
+		break;
 	}
 
 	return 0;
