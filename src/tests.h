@@ -15,4 +15,6 @@ void testPerft(const char* filename, const int depth);
 
 void testKeys(void);
 
+void testDraw(void);
+
 #endif /* SRC_TESTS_H_ */

@@ -1,6 +1,7 @@
 
 #include "board.h"
 #include "play.h"
+#include "draw.h"
 #include "hashtables.h"
 
 #include <time.h>
@@ -146,4 +147,17 @@ void testKeys(void) {
 
 	free(board1);
 	free(board2);
+}
+
+void testDraw(void) {
+	Board *board1 = malloc(sizeof(Board));
+	Board *board2 = malloc(sizeof(Board));
+
+	parseFen(board1, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK2R w KQkq -");
+	parseFen(board2, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK2R w KQkq -");
+
+	isDraw(board2);
+
+	printf("%" PRIu64 "\n", zobristKey(board1));
+	printf("%" PRIu64 "\n", zobristKey(board2));
 }

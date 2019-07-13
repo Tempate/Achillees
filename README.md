@@ -4,34 +4,33 @@ This project is an attempt at making a readable and accessible chess engine. It'
 
 All comments and feedback are appreciated. Feel free to join us at `##chessprogramming` on [Freenode IRC](https://webchat.freenode.net) and share your thoughts.
 
-You are also free to challenge it on [Lichess](https://lichess.org/@/Achillees)
+You are also free to challenge it on [Lichess](https://lichess.org/@/Achillees).
 
 ## Features
+
+> The project is under active development and new features will come shortly.
 
 ### Evaluation
 - Material count
 - Piece-Square tables
 
 - Pawn structure
-	- Isolated Pawns
-	- Doubled Pawns
-	- Passed Pawns
+	- Isolated, doubled, passed, backward and pawn-chains
 	
-- Bishop and knight pair
+- Knight pair
+- Bishop pair
 
 - Rooks
-	- Open/Semi-open files
-	- Seventh rank
-	- Doubled rooks
+	- Open and semi-open files
+	- Doubled and connected
 	
 - King safety
 
 ### Search
 - AlphaBeta Pruning
-- Transposition/Refutation Tables
 - Move ordering
-
-> The project is under active development and new features will come shortly.
+- Transposition/Refutation Tables
+- Null move pruning
 
 ## Running the code
 

@@ -10,15 +10,11 @@ static void pawnPseudoLegalMoves  (const Board *board, Move *moves, int *n);
 static void knightPseudoLegalMoves(const Board *board, Move *moves, int *n);
 static void kingPseudoLegalMoves  (const Board *board, Move *moves, int *n);
 
-static void slidingPiecePseudoLegalMoves(const Board *board, Move *moves, int *n, uint64_t (*movesFunc)(int, uint64_t, uint64_t), int piece);
+static void slidingPiecePseudoLegalMoves(const Board *board, Move *moves, int *n, uint64_t (*movesFunc)(int, uint64_t, uint64_t), const int piece, const int color);
 
 static void pawnMoves(Move *moves, int *n, uint64_t bb, int color, int shift);
 
 static const uint64_t knightMoves(int index);
-
-static uint64_t bishopMoves(int index, uint64_t occupied, uint64_t myPieces);
-static uint64_t rookMoves  (int index, uint64_t occupied, uint64_t myPieces);
-static uint64_t queenMoves (int index, uint64_t occupied, uint64_t myPieces);
 
 static uint64_t rayAttacks(int index, uint64_t occupied, uint64_t myPieces, int bitScan(uint64_t), int dir);
 
@@ -46,15 +42,17 @@ int legalMoves(Board *board, Move *moves) {
 }
 
 static int pseudoLegalMoves(const Board *board, Move *moves) {
+	const int color = board->turn;
 	int n = 0;
 
 	pawnPseudoLegalMoves  (board, moves, &n);
 	knightPseudoLegalMoves(board, moves, &n);
-	kingPseudoLegalMoves  (board, moves, &n);
 
-	slidingPiecePseudoLegalMoves(board, moves, &n, bishopMoves, BISHOP);
-	slidingPiecePseudoLegalMoves(board, moves, &n, rookMoves, ROOK);
-	slidingPiecePseudoLegalMoves(board, moves, &n, queenMoves, QUEEN);
+	slidingPiecePseudoLegalMoves(board, moves, &n, bishopMoves, BISHOP, color);
+	slidingPiecePseudoLegalMoves(board, moves, &n, rookMoves,   ROOK,   color);
+	slidingPiecePseudoLegalMoves(board, moves, &n, queenMoves,  QUEEN,  color);
+
+	kingPseudoLegalMoves  (board, moves, &n);
 
 	return n;
 }
@@ -269,8 +267,7 @@ const uint64_t kingMoves(int index) {
 }
 
 // SLIDING PIECES
-static void slidingPiecePseudoLegalMoves(const Board *board, Move *moves, int *n, uint64_t (*movesFunc)(int, uint64_t, uint64_t), int piece) {
-	const int color = board->turn;
+static void slidingPiecePseudoLegalMoves(const Board *board, Move *moves, int *n, uint64_t (*movesFunc)(int, uint64_t, uint64_t), const int piece, const int color) {
 	int from, to;
 
 	uint64_t movesBB, bb = board->pieces[color][piece];
@@ -286,21 +283,21 @@ static void slidingPiecePseudoLegalMoves(const Board *board, Move *moves, int *n
 	} while (unsetLSB(bb));
 }
 
-static uint64_t bishopMoves(int index, uint64_t occupied, uint64_t myPieces) {
+uint64_t bishopMoves(int index, uint64_t occupied, uint64_t myPieces) {
 	return  rayAttacks(index, occupied, myPieces, bitScanForward, NOEA) |
 			rayAttacks(index, occupied, myPieces, bitScanForward, NOWE) |
 			rayAttacks(index, occupied, myPieces, bitScanReverse, SOEA) |
 			rayAttacks(index, occupied, myPieces, bitScanReverse, SOWE);
 }
 
-static uint64_t rookMoves(int index, uint64_t occupied, uint64_t myPieces) {
+uint64_t rookMoves(int index, uint64_t occupied, uint64_t myPieces) {
 	return  rayAttacks(index, occupied, myPieces, bitScanForward, NORT) |
 			rayAttacks(index, occupied, myPieces, bitScanForward, EAST) |
 			rayAttacks(index, occupied, myPieces, bitScanReverse, SOUT) |
 			rayAttacks(index, occupied, myPieces, bitScanReverse, WEST);
 }
 
-static uint64_t queenMoves(int index, uint64_t occupied, uint64_t myPieces) {
+uint64_t queenMoves(int index, uint64_t occupied, uint64_t myPieces) {
 	return bishopMoves(index, occupied, myPieces) | rookMoves(index, occupied, myPieces);
 }
 
