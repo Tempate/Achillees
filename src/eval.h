@@ -21,5 +21,7 @@ typedef struct {
 int finalEval(const Board *board, const int depth);
 int eval(const Board *board);
 
+int isEndgame(const Board *board);
+
 
 #endif /* SRC_EVAL_H_ */

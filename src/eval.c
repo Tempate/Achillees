@@ -9,16 +9,23 @@
 #define ROOK_VAL			550
 #define QUEE_VAL			900
 
-#define BISH_PAIR			+25
-#define KNIG_PAIR			+15
+#define BISH_PAIR			+30
+#define KNIG_PAIR			-15
 
 #define DOUB_PAWN 			-10
-#define ISOL_PAWN			-20
-#define BACK_PAWN			+8
+#define ISOL_PAWN			-10
+#define BACK_PAWN			-8
+#define CONN_PAWN			+2
 
-#define ROOKS_DOUBLED 		+20
-#define ROOK_OPEN_FILE 		+15
-#define ROOK_SEMIOPEN_FILE 	+10
+#define BISH_MOBI			+2
+
+#define OPFI_ROOKS			+20
+#define SEFI_ROOKS			+10
+#define CONN_ROOKS			+15
+#define DOUB_ROOKS			+20
+
+#define CASTLED				+20
+#define CAN_CASTLE			+6
 
 #define NEAR_KING			+5
 
@@ -32,18 +39,23 @@ static inline int taperedEval(const int phase, const int opening, const int endg
 static int pieceSquareTables(const Board *board, const int phase, const int color);
 
 static int pawnStructure(const Board *board, const int color);
-static int rookScore    (const Board *board, const int color);
-static int kingSafety   (const Board *board, const int color);
+static int pawnScore(const uint64_t bb, const uint64_t opBB, const int color);
+
+static int rookScore     (const Board *board, const int color);
+static int connectedRooks(const Board *board);
+
+static int kingSafety   (const Board *board, const int phase, const int color);
 
 static int materialCount(const Count *count);
 static int knightScore  (const Count *count);
 static int bishopScore  (const Count *count);
 
-static int backwardPawns(const uint64_t bb, const uint64_t opBB, const int color);
+static int mobility(const Board *board, const int color);
 
 
 
 static const uint64_t files[8] = { 0x101010101010101, 0x202020202020202, 0x404040404040404, 0x808080808080808, 0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080 };
+// static const uint64_t ranks[8] = { 0xff, 0xff00, 0xff0000, 0xff000000, 0xff00000000, 0xff0000000000, 0xff000000000000, 0xff00000000000000 };
 
 /*
  * Evaluates a position which has no possible moves.
@@ -71,9 +83,6 @@ int eval(const Board *board) {
 
 	countPieces(board, &wCount, &bCount);
 
-	if (isDraw(board))
-		return 0;
-
 	const int phase = getPhase(&wCount, &bCount);
 
 	int score = 0;
@@ -81,13 +90,15 @@ int eval(const Board *board) {
 	score += materialCount(&wCount) - materialCount(&bCount);
 	score += pieceSquareTables(board, phase, WHITE) - pieceSquareTables(board, phase, BLACK);
 
-	score += pawnStructure(board, WHITE) - pawnStructure(board, BLACK);
+	//score += pawnStructure(board, WHITE) - pawnStructure(board, BLACK);
 
-	score += knightScore(&wCount) - knightScore(&bCount);
-	score += bishopScore(&wCount) - bishopScore(&bCount);
+	// score += knightScore(&wCount) - knightScore(&bCount);
+	//score += bishopScore(&wCount) - bishopScore(&bCount);
 
-	score += rookScore(board, WHITE) - rookScore(board, BLACK);
-	score += kingSafety(board, WHITE) - kingSafety(board, BLACK);
+	//score += rookScore(board, WHITE)  - rookScore(board, BLACK);
+	//score += kingSafety(board, phase, WHITE) - kingSafety(board, phase, BLACK);
+
+	//score += mobility(board, WHITE) - mobility(board, BLACK);
 
 	if (board->turn == BLACK)
 		score = -score;
@@ -96,19 +107,19 @@ int eval(const Board *board) {
 }
 
 static void countPieces(const Board *board, Count *wCount, Count *bCount) {
-	wCount->nPawns =   popCount(board->pieces[WHITE][PAWN]);
+	wCount->nPawns   = popCount(board->pieces[WHITE][PAWN]);
 	wCount->nKnights = popCount(board->pieces[WHITE][KNIGHT]);
 	wCount->nBishops = popCount(board->pieces[WHITE][BISHOP]);
-	wCount->nRooks =   popCount(board->pieces[WHITE][ROOK]);
-	wCount->nQueens =  popCount(board->pieces[WHITE][QUEEN]);
-	wCount->nTotal =   popCount(board->players[WHITE]);
+	wCount->nRooks   = popCount(board->pieces[WHITE][ROOK]);
+	wCount->nQueens  = popCount(board->pieces[WHITE][QUEEN]);
+	wCount->nTotal   = popCount(board->players[WHITE]);
 
-	bCount->nPawns =   popCount(board->pieces[BLACK][PAWN]);
+	bCount->nPawns   = popCount(board->pieces[BLACK][PAWN]);
 	bCount->nKnights = popCount(board->pieces[BLACK][KNIGHT]);
 	bCount->nBishops = popCount(board->pieces[BLACK][BISHOP]);
-	bCount->nRooks =   popCount(board->pieces[BLACK][ROOK]);
-	bCount->nQueens =  popCount(board->pieces[BLACK][QUEEN]);
-	bCount->nTotal =   popCount(board->players[BLACK]);
+	bCount->nRooks   = popCount(board->pieces[BLACK][ROOK]);
+	bCount->nQueens  = popCount(board->pieces[BLACK][QUEEN]);
+	bCount->nTotal   = popCount(board->players[BLACK]);
 }
 
 
@@ -127,6 +138,13 @@ static int getPhase(const Count *wCount, const Count *bCount) {
 			queenPhase  * (wCount->nQueens  + bCount->nQueens);
 
     return (phase * 256 + (totalPhase / 2)) / totalPhase;
+}
+
+/*
+ * An endgame is considered when the side to move only has pawns.
+ */
+int isEndgame(const Board *board) {
+	return (board->pieces[board->turn][KING] | board->pieces[board->turn][PAWN]) == board->players[board->turn];
 }
 
 static inline int taperedEval(const int phase, const int opening, const int endgame) {
@@ -197,18 +215,22 @@ static int pawnStructure(const Board *board, const int color) {
 
 	int score = 0;
 
-	score -= BACK_PAWN * backwardPawns(bb, opBB, color);
+	//score += pawnScore(bb, opBB, color);
 
 	for (int file = 0; file < FILES; ++file) {
 		const int n = popCount(files[file] & bb);
 
+		/*
 		if ((neighborPawns[file] & bb) == 0) {
-			score -= ISOL_PAWN * n;
+			score += ISOL_PAWN * n;
 		}
+		*/
 
+		/*
 		if (n >= 2) {
-			score -= DOUB_PAWN * (n - 1);
+			score += DOUB_PAWN * (n - 1);
 		}
+		*/
 	}
 
 	if (bb) do {
@@ -224,12 +246,11 @@ static int pawnStructure(const Board *board, const int color) {
 	return score;
 }
 
-/*
- * A backward pawn is, in this case, a pawn whose advancing square is attacked by an opponents pawn
- * and not defended by any of its own pawns.
- */
-static int backwardPawns(const uint64_t bb, const uint64_t opBB, const int color) {
+
+static int pawnScore(const uint64_t bb, const uint64_t opBB, const int color) {
 	uint64_t stops, myAttacks, opAttacks;
+
+	int score = 0;
 
 	if (color == WHITE) {
 		stops = nortOne(bb);
@@ -241,7 +262,24 @@ static int backwardPawns(const uint64_t bb, const uint64_t opBB, const int color
 		opAttacks = noEaOne(opBB) | noWeOne(opBB);
 	}
 
-	return popCount(stops & opAttacks & ~myAttacks);
+	/*
+	 * A backward pawn is, in this case, a pawn whose advancing square is attacked by an opponents pawn
+	 * and not defended by any of its own pawns.
+	 */
+
+	const int nBackwardPawns = popCount(stops & opAttacks & ~myAttacks);
+
+	score += BACK_PAWN * nBackwardPawns;
+
+	/*
+	 * Pawns are given a bonus for being connected
+	 */
+
+	const int nConnectedPawns = popCount(myAttacks & bb);
+
+	score += CONN_PAWN * nConnectedPawns;
+
+	return score;
 }
 
 
@@ -263,37 +301,101 @@ static int bishopScore(const Count *count) {
 
 
 static int rookScore(const Board *board, const int color) {
-	const int opColor = 1 ^ color;
-
 	uint64_t bb = board->pieces[color][ROOK];
 
 	int score = 0;
 
-	for (int f = 0; f < FILES; ++f) {
-		const uint64_t file = files[f];
-		const int n = popCount(file & bb);
+	//score += connectedRooks(board);
 
-		if (n >= 2) {
-			score += ROOKS_DOUBLED;
-		}
+	do {
+		const int rook = bitScanForward(bb);
+		const uint64_t file = get_file(rook);
 
 		if ((file & board->pieces[color][PAWN]) == 0) {
-			if ((file & board->pieces[opColor][PAWN]) == 0) {
-				score += ROOK_OPEN_FILE;
+			if ((file & board->pieces[1 ^ color][PAWN]) == 0) {
+				//score += OPFI_ROOKS;
 			} else {
-				score += ROOK_SEMIOPEN_FILE;
+				//score += SEFI_ROOKS;
 			}
 		}
-	}
+	} while (unsetLSB(bb));
 
 	return score;
 }
 
-static int kingSafety(const Board *board, const int color) {
+/*
+ * Two rooks are connected if they are in the same file or rank
+ * and there are no pieces between them.
+ */
+static int connectedRooks(const Board *board) {
+	const uint64_t rooks = board->pieces[board->turn][ROOK];
+	const uint64_t rook = rooks & -rooks;
+	uint64_t aux;
+
+	// Checks to see if rooks are connected on a file
+
+	aux = rook;
+
+	do {
+		aux = nortOne(aux);
+
+		if (aux & rooks)
+			return DOUB_ROOKS;
+	} while (aux & board->empty);
+
+	// Checks to see if rooks are connected on a rank
+
+	aux = rook;
+
+	do {
+		aux = eastOne(aux);
+
+		if (aux & rooks)
+			return CONN_ROOKS;
+	} while (aux & board->empty);
+
+	return 0;
+}
+
+static int kingSafety(const Board *board, const int phase, const int color) {
 	const int index = bitScanForward(board->pieces[color][KING]);
 	const uint64_t surroundings = kingMoves(index);
 
-	int score = NEAR_KING * popCount(board->players[color] & surroundings);
+	int score = NEAR_KING * popCount(board->pieces[color][PAWN] & surroundings);
+
+	/*
+	if (color == WHITE) {
+		switch (index) {
+		case 2: case 6:
+			score += CASTLED;
+			break;
+		default:
+			score += CAN_CASTLE * popCount(board->castling & 3);
+		}
+	} else {
+		switch (index) {
+		case 58: case 62:
+			score += CASTLED;
+			break;
+		default:
+			score += CAN_CASTLE * popCount(board->castling & 12);
+		}
+	}
+	*/
+
+	return score;
+}
+
+static int mobility(const Board *board, const int color) {
+	int score = 0;
+
+	uint64_t bishops = board->pieces[color][BISHOP];
+
+	if (bishops) do {
+		const int bishop = bitScanForward(bishops);
+
+		score += BISH_MOBI * popCount(bishopMoves(bishop, board->occupied, board->players[board->turn]));
+	} while (unsetLSB(bishops));
 
 	return score;
 }
