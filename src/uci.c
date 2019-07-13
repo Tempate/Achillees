@@ -208,7 +208,9 @@ static void evalCmd(const Board *board) {
 }
 
 void infoString(const Board *board, PV *pv, const int score, const int depth, const uint64_t nodes) {
-	fprintf(stdout, "info score cp %d depth %d nodes %ld pv ", score, depth, nodes);
+	const int relativeScore = (board->turn == WHITE) ? score : -score;
+
+	fprintf(stdout, "info score cp %d depth %d nodes %ld pv ", relativeScore, depth, nodes);
 
 	for (int i = 0; i < pv->count; ++i) {
 		char moveText[6];
