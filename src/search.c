@@ -12,7 +12,7 @@
 #include "hashtables.h"
 
 
-static int alphabeta(Board *board, const int depth, int alpha, int beta);
+static int alphabeta(Board *board, const int depth, int alpha, int beta, const int nullmove);
 static PV generatePV(Board board);
 
 static void timeManagement(const Board *board);
@@ -36,14 +36,13 @@ Move search(Board *board) {
 	for (int depth = 1; depth <= settings.depth; ++depth) {
 		nodes = 0;
 
-		const int score = alphabeta(board, depth, -2 * MAX_SCORE, 2 * MAX_SCORE);
+		const int score = alphabeta(board, depth, -2 * MAX_SCORE, 2 * MAX_SCORE, 0);
 
 		if (settings.stop) break;
 
 		bestMove = decompressMove(board, &tt[index].move);
 
 		PV pv = generatePV(*board);
-		bestMove = pv.moves[0];
 
 		infoString(board, &pv, score, depth, nodes);
 	}
@@ -57,7 +56,10 @@ Move search(Board *board) {
  * alpha is the value to maximize and beta the value to minimize.
  * The initial position must have >= 1 legal moves and the initial depth must be >= 1.
  */
-static int alphabeta(Board *board, const int depth, int alpha, int beta) {
+static int alphabeta(Board *board, const int depth, int alpha, int beta, const int nullmove) {
+	assert(beta >= alpha);
+	assert(depth >= 0);
+
 	if (settings.stop)
 		return 0;
 
@@ -74,7 +76,7 @@ static int alphabeta(Board *board, const int depth, int alpha, int beta) {
 	const int index = board->key % HASHTABLE_MAX_SIZE;
 
 	// Transposition Table
-	if (tt[index].key == board->key && tt[index].depth >= depth) {
+	if (tt[index].key == board->key && tt[index].depth == depth) {
 		switch (tt[index].flag) {
 		case LOWER_BOUND:
 			alpha = (alpha > tt[index].score) ? alpha : tt[index].score;
@@ -92,18 +94,17 @@ static int alphabeta(Board *board, const int depth, int alpha, int beta) {
 
 	History history;
 
-	/* Null Move Pruning
-	if (depth > 2 && !inCheck(board)) {
+	// Null Move Pruning
+	if (!nullmove && depth > R && !inCheck(board) && !isEndgame(board)) {
 		makeNullMove(board, &history);
 
-		const int score = -alphabeta(board, depth-1 - R, -beta, -alpha);
+		const int score = -alphabeta(board, depth-1 - R, -beta, -beta + 1, 1);
 
 		undoNullMove(board, &history);
 
 		if (score >= beta)
-			return score;
+			return beta;
 	}
-	*/
 
 	Move moves[218];
 	const int nMoves = legalMoves(board, moves);
@@ -119,7 +120,7 @@ static int alphabeta(Board *board, const int depth, int alpha, int beta) {
 	Move bestMove = moves[0];
 	int bestScore = -2 * MAX_SCORE;
 
-	const int originalAlpha = alpha, originalBeta = beta;
+	const int origAlpha = alpha, origBeta = beta;
 
 	for (int i = 0; i < nMoves; ++i) {
 		makeMove(board, &moves[i], &history);
@@ -131,7 +132,7 @@ static int alphabeta(Board *board, const int depth, int alpha, int beta) {
 		if (isDraw(board)) {
 			score = 0;
 		} else {
-			score = -alphabeta(board, depth-1, -beta, -alpha);
+			score = -alphabeta(board, depth-1, -beta, -alpha, 0);
 		}
 
 		freeKeyFromMemory();
@@ -154,9 +155,9 @@ static int alphabeta(Board *board, const int depth, int alpha, int beta) {
 
 	int flag = EXACT;
 
-	if (bestScore <= originalAlpha) {
+	if (bestScore <= origAlpha) {
 		flag = UPPER_BOUND;
-	} else if (bestScore >= originalBeta) {
+	} else if (bestScore >= origBeta) {
 		flag = LOWER_BOUND;
 	}
 
