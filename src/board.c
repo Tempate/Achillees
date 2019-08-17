@@ -113,23 +113,19 @@ void unsetBits(Board *board, const int color, const int piece, const int index) 
 
 // MOVES
 
-void printMoves(Move *moves, int n) {
+void printMoves(Move *moves, const int n) {
 	for (int i = 0; i < n; ++i)
 		printMove(moves[i], 0);
 
 	printf("\nTotal: %d\n", n);
 }
 
-void printMove(Move move, int nodes) {
+void printMove(const Move move, const int nodes) {
 	char *text = malloc(6);
 
 	moveToText(move, text);
 
-	if (nodes) {
-		printf("%s \t %d\n", text, nodes);
-	} else {
-		printf("%s\n", text);
-	}
+	printf("%s \t %d\n", text, nodes);
 
 	free(text);
 }
@@ -138,7 +134,7 @@ void moveToText(Move move, char *text) {
 	static const char pieceNames[6] = {'p', 'n', 'b', 'r', 'q', 'k'};
 	static const uint64_t promotion = 0xff000000000000ff;
 
-	if (move.piece == PAWN && (pow2[move.to] & promotion)) {
+	if (move.piece == PAWN && (square[move.to] & promotion)) {
 		snprintf(text, 6, "%s%s%c", sqToCoord(move.from), sqToCoord(move.to), pieceNames[move.promotion]);
 	} else {
 		snprintf(text, 5, "%s%s", sqToCoord(move.from), sqToCoord(move.to));
@@ -154,7 +150,7 @@ Move textToMove(const Board *board, char *text) {
 	move.from = coordToSq(text);
 	move.to = coordToSq(text + 2);
 
-	fromBB = pow2[move.from];
+	fromBB = square[move.from];
 	move.color = (fromBB & board->players[WHITE]) ? WHITE : BLACK;
 
 	if (text[4] >= 'a' && text[4] <= 'z') {
@@ -220,10 +216,10 @@ int parseFen(Board *board, char *fen) {
 		board->castling = 0;
 		++i;
 	} else {
-		if (fen[i] == 'K') { board->castling += pow2[0]; ++i; }
-		if (fen[i] == 'Q') { board->castling += pow2[1]; ++i; }
-		if (fen[i] == 'k') { board->castling += pow2[2]; ++i; }
-		if (fen[i] == 'q') { board->castling += pow2[3]; ++i; }
+		if (fen[i] == 'K') { board->castling += square[0]; ++i; }
+		if (fen[i] == 'Q') { board->castling += square[1]; ++i; }
+		if (fen[i] == 'k') { board->castling += square[2]; ++i; }
+		if (fen[i] == 'q') { board->castling += square[3]; ++i; }
 	}
 
 	if (fen[++i] == '-') {
@@ -314,10 +310,10 @@ void generateFen(const Board *board, char *fen) {
 	if (board->castling == -1) {
 		fen[++k] = '-';
 	} else {
-		if (board->castling & pow2[0]) fen[++k] = 'K';
-		if (board->castling & pow2[1]) fen[++k] = 'Q';
-		if (board->castling & pow2[2]) fen[++k] = 'k';
-		if (board->castling & pow2[3]) fen[++k] = 'q';
+		if (board->castling & square[0]) fen[++k] = 'K';
+		if (board->castling & square[1]) fen[++k] = 'Q';
+		if (board->castling & square[2]) fen[++k] = 'k';
+		if (board->castling & square[3]) fen[++k] = 'q';
 	}
 
 	fen[++k] = ' ';

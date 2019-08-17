@@ -31,7 +31,7 @@ void listen(void) {
 	Board *board = malloc(sizeof(Board));
 
 	char message[4096], *r, *part;
-	int depth, quit = 0;
+	int quit = 0;
 
 	pthread_t worker;
 	int working = 0;
@@ -72,7 +72,7 @@ void listen(void) {
 		} else if (strncmp(part, "print", 5) == 0) {
 			printBoard(board);
 		} else if (strncmp(part, "perft", 5) == 0) {
-			depth = atoi(part + 6);
+			const int depth = atoi(part + 6);
 			perftUntilDepth(board, depth);
 		} else if (strncmp(part, "eval", 4) == 0) {
 			evalCmd(board);
@@ -114,11 +114,6 @@ static void ucinewgame(Board *board) {
  * position (startpos | fen) (moves e2e4 c7c5)?
  */
 static void position(Board *board, char *s) {
-	History history;
-	Move move;
-
-	char *moveText, *rest;
-
 	if (strncmp(s, "startpos", 8) == 0) {
 		s += 9;
 		ucinewgame(board);
@@ -128,10 +123,17 @@ static void position(Board *board, char *s) {
 
 	if (strncmp(s, "moves", 5) == 0) {
 		s += 6;
+
+		char *rest;
 		rest = s;
 
+		char *moveText;
+
 		while ((moveText = strtok_r(rest, " ", &rest))) {
-			move = textToMove(board, moveText);
+			const Move move = textToMove(board, moveText);
+
+			History history;
+
 			makeMove(board, &move, &history);
 			updateBoardKey(board, &move, &history);
 			saveKeyToMemory(board->key);
@@ -183,10 +185,9 @@ static void go(Settings *settings, char *s) {
 
 static void *bestmove(void *args) {
 	Board *board = (Board *) args;
-	Move move;
 	char pv[6];
 
-	move = search(board);
+	const Move move = search(board);
 	moveToText(move, pv);
 
 	fprintf(stdout, "bestmove %s\n", pv);
@@ -207,10 +208,10 @@ static void evalCmd(const Board *board) {
 	fflush(stdout);
 }
 
-void infoString(const Board *board, PV *pv, const int score, const int depth, const uint64_t nodes) {
+void infoString(const Board *board, PV *pv, const int score, const int depth, const long duration, const uint64_t nodes) {
 	const int relativeScore = (board->turn == WHITE) ? score : -score;
 
-	fprintf(stdout, "info score cp %d depth %d nodes %ld pv ", relativeScore, depth, nodes);
+	fprintf(stdout, "info score cp %d depth %d time %ld nodes %ld pv ", relativeScore, depth, duration, nodes);
 
 	for (int i = 0; i < pv->count; ++i) {
 		char moveText[6];
@@ -228,13 +229,12 @@ void infoString(const Board *board, PV *pv, const int score, const int depth, co
 static void perftUntilDepth(Board *board, const int depth) {
 	long nodes = 0;
 
-	clock_t start, duration;
-
 	for (int d = 1; d <= depth; ++d) {
-		start = clock();
+		const clock_t start = clock();
 		nodes = perft(board, d);
-		duration = 1000 * (clock() - start) / CLOCKS_PER_SEC;
-		fprintf(stdout, "info depth %d nodes %ld time %d\n", d, nodes, (int) duration);
+		const long duration = (long) 1000 * (clock() - start) / CLOCKS_PER_SEC;
+
+		fprintf(stdout, "info depth %d nodes %ld time %ld\n", d, nodes, duration);
 	}
 
 	fprintf(stdout, "nodes %ld\n", nodes);

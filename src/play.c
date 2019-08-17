@@ -10,19 +10,19 @@ const int castleLookup[4][3] = {{6, 7, 5}, {2, 0, 3}, {62, 63, 61}, {58, 56, 59}
 
 
 long perft(Board *board, const int depth) {
-	Move moves[218];
-	History history;
+	Move moves[MAX_MOVES];
 
-	int k, newDepth;
 	long nodes = 0;
 
 	if (depth == 1) {
 		nodes = legalMoves(board, moves);
 	} else {
-		newDepth = depth - 1;
-		k = legalMoves(board, moves);
+		const int newDepth = depth - 1;
+		const int k = legalMoves(board, moves);
 
 		for (int i = 0; i < k; ++i) {
+			History history;
+
 			makeMove(board, &moves[i], &history);
 			nodes += perft(board, newDepth);
 			undoMove(board, &moves[i], &history);
@@ -36,8 +36,6 @@ long perft(Board *board, const int depth) {
 void makeMove(Board *board, const Move *move, History *history) {
 	static const int removeCastling[2] = {12, 3};
 	const int color = move->color, opColor = 1 ^ color;
-
-	int castle;
 
 	history->castling = board->castling;
 	history->enPassant = board->enPassant;
@@ -74,7 +72,7 @@ void makeMove(Board *board, const Move *move, History *history) {
 
 		if (move->castle != -1) {
 			++(board->fiftyMoves);
-			castle = bitScanForward(move->castle);
+			const int castle = bitScanForward(move->castle);
 			setBits  (board, color, KING, castleLookup[castle][0]);
 			unsetBits(board, color, ROOK, castleLookup[castle][1]);
 			setBits  (board, color, ROOK, castleLookup[castle][2]);
@@ -101,7 +99,6 @@ void makeMove(Board *board, const Move *move, History *history) {
 
 void undoMove(Board *board, const Move *move, const History *history) {
 	const int color = move->color, opColor = 1 ^ color;
-	int castle;
 
 	board->castling = history->castling;
 	board->enPassant = history->enPassant;
@@ -126,7 +123,7 @@ void undoMove(Board *board, const Move *move, const History *history) {
 		}
 	case KING:
 		if (move->castle != -1) {
-			castle = bitScanForward(move->castle);
+			const int castle = bitScanForward(move->castle);
 			unsetBits(board, color, KING, castleLookup[castle][0]);
 			setBits  (board, color, ROOK, castleLookup[castle][1]);
 			unsetBits(board, color, ROOK, castleLookup[castle][2]);
@@ -169,7 +166,7 @@ void undoNullMove(Board *board, History *history) {
 }
 
 void checkCapture(Board *board, History *history, int index, int color) {
-	uint64_t toBB = pow2[index];
+	const uint64_t toBB = square[index];
 
 	if (toBB & board->players[color]) {
 		history->capture = findPiece(board, toBB, color);

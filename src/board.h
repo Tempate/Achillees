@@ -30,8 +30,8 @@ static inline uint64_t get_sqr(int file, int rank) { return (uint64_t) 1ULL << (
 static inline int get_rank(uint64_t sqr) { return sqr / 8; }
 static inline int get_file(uint64_t sqr) { return sqr % 8; }
 
-static inline uint64_t setBit  (uint64_t *bb, int i) { return *bb |= pow2[i]; }
-static inline uint64_t unsetBit(uint64_t *bb, int i) { return *bb &= ~pow2[i]; }
+static inline uint64_t setBit  (uint64_t *bb, int i) { return *bb |= square[i]; }
+static inline uint64_t unsetBit(uint64_t *bb, int i) { return *bb &= ~square[i]; }
 
 static inline uint64_t soutOne (uint64_t b) { return b >> 8; }
 static inline uint64_t nortOne (uint64_t b) { return b << 8; }

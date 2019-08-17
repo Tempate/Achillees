@@ -4,7 +4,7 @@
 
 
 #define PAWN_VAL			100
-#define KNIG_VAL			330
+#define KNIG_VAL			325
 #define BISH_VAL			330
 #define ROOK_VAL			550
 #define QUEE_VAL			900
@@ -131,7 +131,7 @@ static int getPhase(const Count *wCount, const Count *bCount) {
 
     const int totalPhase = 4 * knightPhase + 4 * bishopPhase + 4 * rookPhase + 2 * queenPhase;
 
-    int phase = totalPhase -
+    const int phase = totalPhase -
     		knightPhase * (wCount->nKnights + bCount->nKnights) -
     		bishopPhase * (wCount->nBishops + bCount->nBishops) -
 			rookPhase   * (wCount->nRooks   + bCount->nRooks)   -
@@ -144,7 +144,8 @@ static int getPhase(const Count *wCount, const Count *bCount) {
  * An endgame is considered when the side to move only has pawns.
  */
 int isEndgame(const Board *board) {
-	return (board->pieces[board->turn][KING] | board->pieces[board->turn][PAWN]) == board->players[board->turn];
+	const int color = board->turn;
+	return (board->pieces[color][KING] | board->pieces[color][PAWN]) == board->players[color];
 }
 
 static inline int taperedEval(const int phase, const int opening, const int endgame) {

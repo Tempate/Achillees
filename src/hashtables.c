@@ -232,11 +232,8 @@ void initializeTT(void) {
  * and white's turn has a key.
  */
 uint64_t zobristKey(const Board *board) {
-	int sqr, castle, offset, pieceOffset;
-	uint64_t bb, key;
-
-	key = 0;
-	castle = board->castling;
+	uint64_t key = 0;
+	int castle = board->castling;
 
 	/*
 	 * Adds the keys for each piece, of each color.
@@ -244,12 +241,12 @@ uint64_t zobristKey(const Board *board) {
 	 */
 	for (int color = WHITE; color <= BLACK; ++color) {
 		for (int piece = PAWN; piece <= KING; ++piece) {
-			bb = board->pieces[color][piece];
-			pieceOffset = getOffset(color, piece, 0);
+			uint64_t bb = board->pieces[color][piece];
+			const int pieceOffset = getOffset(color, piece, 0);
 
 			if (bb) do {
-				sqr = bitScanForward(bb);
-				offset = pieceOffset + sqr;
+				const int sqr = bitScanForward(bb);
+				const int offset = pieceOffset + sqr;
 				key ^= randomKeys[offset];
 			} while (unsetLSB(bb));
 		}
@@ -260,7 +257,7 @@ uint64_t zobristKey(const Board *board) {
 	 * Indexes are KC = 768, QC = 769, kC = 770, qC = 771
 	 */
 	if (castle) do {
-		offset = CAST_OFFSET + bitScanForward(castle);
+		const int offset = CAST_OFFSET + bitScanForward(castle);
 		key ^= randomKeys[offset];
 	} while (unsetLSB(castle));
 
@@ -269,16 +266,15 @@ uint64_t zobristKey(const Board *board) {
 	 * It just takes into account the file of the enPassant, as the turn would make it unique.
 	 */
 	if (board->enPassant) {
-		offset = ENPA_OFFSET + get_file(board->enPassant);
+		const int offset = ENPA_OFFSET + get_file(board->enPassant);
 		key ^= randomKeys[offset];
 	}
 
 	/*
 	 * Adds the turn key if it's white's turn, if not, it's zero.
 	 */
-	if (board->turn == WHITE) {
+	if (board->turn == WHITE)
 		key ^= randomKeys[TURN_OFFSET];
-	}
 
 	return key;
 }
@@ -290,12 +286,10 @@ uint64_t zobristKey(const Board *board) {
 void updateBoardKey(Board *board, const Move *move, const History *history) {
 	const int color = move->color, opColor = 1 ^ color;
 
-	int offset, castle;
-
 	board->key ^= randomKeys[getOffset(color, move->piece, move->from)];
 
 	if (history->enPassant) {
-		offset = ENPA_OFFSET + get_file(history->enPassant);
+		const int offset = ENPA_OFFSET + get_file(history->enPassant);
 		board->key ^= randomKeys[offset];
 	}
 
@@ -310,7 +304,7 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 		}
 
 		if (board->enPassant) {
-			offset = ENPA_OFFSET + get_file(board->enPassant);
+			const int offset = ENPA_OFFSET + get_file(board->enPassant);
 			board->key ^= randomKeys[offset];
 		} else if (history->enPassant && move->to == history->enPassant) {
 			board->key ^= randomKeys[getOffset(opColor, PAWN, move->to - 8 + 16*color)];
@@ -321,7 +315,7 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 		break;
 	case KING:
 		if (move->castle != -1) {
-			castle = bitScanForward(move->castle);
+			const int castle = bitScanForward(move->castle);
 			board->key ^= randomKeys[getOffset(color, KING, castleLookup[castle][0])];
 			board->key ^= randomKeys[getOffset(color, ROOK, castleLookup[castle][1])];
 			board->key ^= randomKeys[getOffset(color, ROOK, castleLookup[castle][2])];
@@ -369,11 +363,11 @@ Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
 	move.to = moveComp->to;
 	move.promotion = moveComp->promotion;
 
-	move.color = (board->players[WHITE] & pow2[move.from]) ? WHITE : BLACK;
+	move.color = (board->players[WHITE] & square[move.from]) ? WHITE : BLACK;
 
 	int piece = PAWN;
 
-	while ((board->pieces[move.color][piece] & pow2[move.from]) == 0)
+	while ((board->pieces[move.color][piece] & square[move.from]) == 0)
 		++piece;
 
 	move.piece = piece;
@@ -421,10 +415,10 @@ int getOffset(const int color, const int piece, const int sqr) {
 
 // Updates the key for the changes made on allowed castles
 void updateCastleKey(Board *board, const int oldCast, const int newCast) {
-	int offset, removedCastle = oldCast ^ newCast;
+	int removedCastle = oldCast ^ newCast;
 
 	if (removedCastle) do {
-		offset = CAST_OFFSET + bitScanForward(removedCastle);
+		const int offset = CAST_OFFSET + bitScanForward(removedCastle);
 		board->key ^= randomKeys[offset];
 	} while (unsetLSB(removedCastle));
 }
