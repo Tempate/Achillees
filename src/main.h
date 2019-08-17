@@ -12,7 +12,7 @@
 #define RANKS 8
 #define PIECES 6
 
-extern uint64_t pow2[64];
+extern uint64_t square[64];
 
 enum {WHITE, BLACK};
 enum {PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};

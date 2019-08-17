@@ -17,4 +17,7 @@ void testKeys(void);
 
 void testDraw(void);
 
+void testSearch(Board *board, const int depth);
+void testPosition(char* fen, const int depth);
+
 #endif /* SRC_TESTS_H_ */
