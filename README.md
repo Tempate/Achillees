@@ -4,7 +4,7 @@ This project is an attempt at making a readable and accessible chess engine. It'
 
 All comments and feedback are appreciated. Feel free to join us at `##chessprogramming` on [Freenode IRC](https://webchat.freenode.net) and share your thoughts.
 
-You are also free to challenge it on [Lichess](https://lichess.org/@/Achillees).
+You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
 
 ## Features
 
@@ -14,23 +14,12 @@ You are also free to challenge it on [Lichess](https://lichess.org/@/Achillees).
 - Material count
 - Piece-Square tables
 
-- Pawn structure
-	- Isolated, doubled, passed, backward and pawn-chains
-	
-- Knight pair
-- Bishop pair
-
-- Rooks
-	- Open and semi-open files
-	- Doubled and connected
-	
-- King safety
-
 ### Search
 - AlphaBeta Pruning
 - Move ordering
-- Transposition/Refutation Tables
+- Transposition Table
 - Null move pruning
+- Quiescence search
 
 ## Running the code
 
@@ -53,6 +42,6 @@ make all
 
 ## Credits
 
-Special thanks to the [chessprogramming wiki](https://www.chessprogramming.org/Main_Page), as most of the knowledge needed came from reading through it, to [ROCE](http://www.rocechess.ch/rocee.html), without which it would have taken ages to pass perft, and to [Daily Chess](https://www.dailychess.com/rival/programming/index.php) for their fantastic guide.
+Special thanks to the [chessprogramming wiki](https://www.chessprogramming.org/Main_Page), as most of the knowledge needed came from reading through it; to [ROCE](http://www.rocechess.ch/rocee.html), without which it would have taken ages to pass perft; and to [Daily Chess](https://www.dailychess.com/rival/programming/index.php) for their fantastic guide.
 
 I also feel the need to thank everyone on `##chessprogramming` on [Freenode IRC](https://webchat.freenode.net) for their support, encouragement, and exhaustive help.
