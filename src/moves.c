@@ -101,6 +101,54 @@ int kingInCheck(const Board *board, const uint64_t kingBB, const int color) {
 	return 0;
 }
 
+/*
+ * Returns the square the smallest attacker is in.
+ * If no one is attacking that square, returns -1.
+ */
+int getSmallestAttacker(Board *board, const int sqr, const int color) {
+	const uint64_t sqrBB = square[sqr];
+	const int opColor = 1 ^ color;
+
+	uint64_t attacker;
+
+	if (color == BLACK) {
+		attacker = noEaOne(sqrBB) & board->pieces[color][PAWN];
+		if (attacker) return bitScanForward(attacker);
+
+		attacker = noWeOne(sqrBB) & board->pieces[color][PAWN];
+		if (attacker) return bitScanForward(attacker);
+	} else {
+		attacker = soEaOne(sqrBB) & board->pieces[color][PAWN];
+		if (attacker) return bitScanForward(attacker);
+
+		attacker = soWeOne(sqrBB) & board->pieces[color][PAWN];
+		if (attacker) return bitScanForward(attacker);
+	}
+
+	attacker = knightMoves(sqr) & board->pieces[color][KNIGHT];
+	if (attacker) return bitScanForward(attacker);
+
+	const uint64_t bishop_moves = bishopMoves(sqr, board->occupied, board->players[opColor]);
+
+	attacker = bishop_moves & board->pieces[color][BISHOP];
+	if (attacker) return bitScanForward(attacker);
+
+	const uint64_t rook_moves = rookMoves(sqr, board->occupied, board->players[opColor]);
+
+	attacker = rook_moves & board->pieces[color][ROOK];
+	if (attacker) return bitScanForward(attacker);
+
+	const uint64_t queen_moves = bishop_moves | rook_moves;
+
+	attacker = queen_moves & board->pieces[color][QUEEN];
+	if (attacker) return bitScanForward(attacker);
+
+	attacker = kingMoves(sqr) & board->pieces[color][KING];
+	if (attacker) return bitScanForward(attacker);
+
+	return -1;
+}
+
 // PAWN
 
 static inline uint64_t wSinglePushPawn(const uint64_t bb, const uint64_t empty)    { return nortOne(bb) & empty; }
@@ -237,7 +285,7 @@ static void kingPLMoves(const Board *board, Move *moves, int *n) {
 		if (castle && ((board->occupied & freeSqrsToCastle[kingCastle]) == 0) &&
 				(kingInCheck(board, legalToCastle[kingCastle], color) == 0))
 		{
-			moves[(*n)++] = (Move){.from=from, .to=from + 2, .piece=KING, .color=color, .castle=castle};
+			moves[(*n)++] = (Move){.from=from, .to=from + 2, .piece=KING, .color=color, .castle=castle, .promotion=0};
 		}
 
 		const int queenCastle = kingCastle + 1;
@@ -246,7 +294,7 @@ static void kingPLMoves(const Board *board, Move *moves, int *n) {
 		if (castle && ((board->occupied & freeSqrsToCastle[queenCastle]) == 0) &&
 				(kingInCheck(board, legalToCastle[queenCastle], color) == 0))
 		{
-			moves[(*n)++] = (Move){.from=from, .to=from - 2, .piece=KING, .color=color, .castle=castle};
+			moves[(*n)++] = (Move){.from=from, .to=from - 2, .piece=KING, .color=color, .castle=castle, .promotion=0};
 		}
 	}
 }
@@ -327,7 +375,7 @@ static void saveMoves(Move *moves, int *n, const int piece, const uint64_t moves
 
 	if (bb) do {
 		const int to = bitScanForward(bb);
-		moves[(*n)++] = (Move){.from=from, .to=to, .piece=piece, .color=color, .capture=capture, .castle=-1};
+		moves[(*n)++] = (Move){.from=from, .to=to, .piece=piece, .color=color, .capture=capture, .castle=-1, .promotion=0};
 	} while (unsetLSB(bb));
 }
 
