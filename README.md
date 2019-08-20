@@ -16,10 +16,12 @@ You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
 
 ### Search
 - AlphaBeta Pruning
-- Move ordering
 - Transposition Table
-- Null move pruning
+- Move ordering (PV-bonus, MVV-LVA, killer moves)
 - Quiescence search
+- Check extensions
+- Null move pruning
+- Late move reduction
 
 ## Running the code
 

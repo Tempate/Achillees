@@ -18,6 +18,9 @@ typedef struct {
 } Count;
 
 
+extern int pieceValues[6];
+
+
 int finalEval(const Board *board, const int depth);
 int eval(const Board *board);
 

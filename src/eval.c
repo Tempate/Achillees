@@ -2,13 +2,6 @@
 #include "draw.h"
 #include "eval.h"
 
-
-#define PAWN_VAL			100
-#define KNIG_VAL			325
-#define BISH_VAL			330
-#define ROOK_VAL			550
-#define QUEE_VAL			900
-
 #define BISH_PAIR			+30
 #define KNIG_PAIR			-15
 
@@ -53,6 +46,7 @@ static int bishopScore  (const Count *count);
 static int mobility(const Board *board, const int color);
 
 
+int pieceValues[6] = {100, 300, 300, 525, 900, 10000};
 
 static const uint64_t files[8] = { 0x101010101010101, 0x202020202020202, 0x404040404040404, 0x808080808080808, 0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080 };
 // static const uint64_t ranks[8] = { 0xff, 0xff00, 0xff0000, 0xff000000, 0xff00000000, 0xff0000000000, 0xff000000000000, 0xff00000000000000 };
@@ -153,11 +147,11 @@ static inline int taperedEval(const int phase, const int opening, const int endg
 }
 
 static int materialCount(const Count *count) {
-	return  PAWN_VAL * count->nPawns +
-			KNIG_VAL * count->nKnights +
-			BISH_VAL * count->nBishops +
-			ROOK_VAL * count->nRooks +
-			QUEE_VAL * count->nQueens;
+	return  pieceValues[PAWN]   * count->nPawns +
+			pieceValues[KNIGHT] * count->nKnights +
+			pieceValues[BISHOP] * count->nBishops +
+			pieceValues[ROOK]   * count->nRooks +
+			pieceValues[QUEEN]  * count->nQueens;
 }
 
 /*

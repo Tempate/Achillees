@@ -12,6 +12,8 @@
 #define RANKS 8
 #define PIECES 6
 
+#define MAX_GAME_LENGTH 1024
+
 extern uint64_t square[64];
 
 enum {WHITE, BLACK};

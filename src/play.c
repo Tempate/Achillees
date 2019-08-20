@@ -3,8 +3,8 @@
 #include "hashtables.h"
 
 
-void checkCapture(Board *board, History *history, int index, int color);
-void removeCastlingForRook(Board *board, int index, int color);
+void checkCapture(Board *board, History *history, const int index, const int color);
+void removeCastlingForRook(Board *board, const int index, const int color);
 
 const int castleLookup[4][3] = {{6, 7, 5}, {2, 0, 3}, {62, 63, 61}, {58, 56, 59}};
 
@@ -156,7 +156,7 @@ void makeNullMove(Board *board, History *history) {
 	updateNullMoveKey(board);
 }
 
-void undoNullMove(Board *board, History *history) {
+void undoNullMove(Board *board, const History *history) {
 	board->fiftyMoves = history->fiftyMoves;
 	board->enPassant  = history->enPassant;
 
@@ -165,7 +165,7 @@ void undoNullMove(Board *board, History *history) {
 	updateNullMoveKey(board);
 }
 
-void checkCapture(Board *board, History *history, int index, int color) {
+void checkCapture(Board *board, History *history, const int index, const int color) {
 	const uint64_t toBB = square[index];
 
 	if (toBB & board->players[color]) {
@@ -181,16 +181,16 @@ void checkCapture(Board *board, History *history, int index, int color) {
 	}
 }
 
-int findPiece(const Board *board, uint64_t toBB, int color) {
+int findPiece(const Board *board, const uint64_t sqrBB, const int color) {
 	for (int piece = PAWN; piece < PIECES; ++piece) {
-		if (toBB & board->pieces[color][piece])
+		if (sqrBB & board->pieces[color][piece])
 			return piece;
 	}
 
 	return -1;
 }
 
-void removeCastlingForRook(Board *board, int index, int color) {
+void removeCastlingForRook(Board *board, const int index, const int color) {
 	static const int removeCastling[2][2] = {{14, 11}, {13, 7}};
 
 	if (index == 56*color) {
