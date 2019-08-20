@@ -8,11 +8,12 @@
 #ifndef SRC_DRAW_H_
 #define SRC_DRAW_H_
 
+#include "main.h"
 #include "eval.h"
 
 
 typedef struct {
-	uint64_t keys[1024];
+	uint64_t keys[MAX_GAME_LENGTH];
 	int size;
 } Memory;
 

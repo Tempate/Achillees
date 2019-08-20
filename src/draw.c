@@ -8,14 +8,20 @@ static int insufficientMaterial(const Board *board);
 Memory memory = (Memory) { .size = 0 };
 
 int isDraw(const Board *board) {
-	if (threeFoldRepetition(board))
+	if (threeFoldRepetition(board)) {
+		//printf("3fold repetition\n");
 		return 1;
+	}
 
-	if (insufficientMaterial(board))
+	if (insufficientMaterial(board)) {
+		//printf("Insufficient material\n");
 		return 1;
+	}
 
-	if (board->fiftyMoves >= 100)
+	if (board->fiftyMoves >= 100) {
+		//printf("50 moves draw\n");
 		return 1;
+	}
 
 	return 0;
 }
@@ -64,14 +70,16 @@ static int insufficientMaterial(const Board *board) {
 
 
 static int threeFoldRepetition(const Board *board) {
-	int counter = 1;
+	int counter = 0;
 
-	for (int i = memory.size - board->fiftyMoves; i < memory.size; i += 2) {
-		if (board->key == memory.keys[i])
-			++counter;
+	for (int i = memory.size - board->fiftyMoves - 1; i < memory.size; ++i) {
+		if (board->key == memory.keys[i]) {
+			if (++counter == 3)
+				return 1;
+		}
 	}
 
-	return (counter >= 3) ? 1 : 0;
+	return 0;
 }
 
 void saveKeyToMemory(const uint64_t key) {
