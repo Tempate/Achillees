@@ -44,10 +44,35 @@ Move search(Board *board) {
 
 	const int index = board->key % HASHTABLE_MAX_SIZE;
 
+	int alpha = -INFINITY, beta = INFINITY, delta = 15;
+	int score;
+
 	for (int depth = 1; depth <= settings.depth; ++depth) {
 		nodes = 0;
 
-		const int score = alphabeta(board, depth, -2 * MAX_SCORE, 2 * MAX_SCORE, 0);
+		// Aspiration window
+		if (depth >= 6) {
+			alpha = score - delta;
+			beta = score + delta;
+		}
+
+		while (1) {
+			score = alphabeta(board, depth, alpha, beta, 0);
+
+			if (settings.stop)
+				break;
+
+			if (score >= beta) {
+				beta += delta;
+			} else if (score <= alpha) {
+				beta = (beta + alpha) / 2;
+				alpha -= delta;
+			} else {
+				break;
+			}
+
+			delta += delta / 2;
+		}
 
 		if (settings.stop) break;
 
@@ -59,7 +84,7 @@ Move search(Board *board) {
 		infoString(board, &pv, score, depth, duration, nodes);
 	}
 
-	printf("Beta cutoff rate: %.4f\n", (float) instantBetaCutoffs / betaCutoffs);
+	//printf("Beta cutoff rate: %.4f\n", (float) instantBetaCutoffs / betaCutoffs);
 
 	assert(bestMove.to != bestMove.from);
 
@@ -88,6 +113,7 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 
 	const int in_check = inCheck(board);
 
+	// Check extensions
 	if (in_check)
 		++depth;
 
@@ -124,11 +150,6 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 		if (score >= beta) {
 			return beta;
 		}
-	}
-
-	// Futility Pruning
-	if (!nullmove && depth == 1 && !in_check && !isEndgame(board)) {
-
 	}
 
 	Move moves[MAX_MOVES];
@@ -230,6 +251,9 @@ static const int qsearch(Board *board, int alpha, const int beta) {
 		if (!moves[i].capture)
 			continue;
 
+		if (seeCapture(board, &moves[i], board->turn) < 0)
+			continue;
+
 		History history;
 
 		makeMove(board, &moves[i], &history);
@@ -298,6 +322,46 @@ static void initKillerMoves(void) {
 static void saveKillerMove(const Move *move, const int ply) {
 	killerMoves[ply][1] = killerMoves[ply][0];
 	killerMoves[ply][0] = *move;
+}
+
+int see(Board *board, const int sqr, const int color) {
+	const int opColor = 1 ^ color;
+	const int from = getSmallestAttacker(board, sqr, color);
+
+	int value = 0;
+
+	/* Skip it if the square isn't attacked by more pieces. */
+	if (from != -1) {
+		const int attacker = findPiece(board, square[from], color);
+		const int pieceCaptured = findPiece(board, square[sqr], opColor);
+
+		assert(attacker >= 0 && pieceCaptured >= 0);
+
+		const Move move = (Move){.to=sqr, .from=from, .piece=attacker, .color=color, .castle=-1, .promotion=QUEEN, .capture=1};
+
+		History history;
+
+		makeMove(board, &move, &history);
+		const int score = pieceValues[pieceCaptured] - see(board, sqr, opColor);
+		value = (score > 0) ? score : 0;
+		undoMove(board, &move, &history);
+	}
+
+	return value;
+}
+
+int seeCapture(Board *board, const Move *move, const int color) {
+	const int opColor = 1 ^ color;
+
+	History history;
+
+	const int pieceCaptured = findPiece(board, square[move->to], opColor);
+
+	makeMove(board, move, &history);
+	const int value = pieceValues[pieceCaptured] - see(board, move->to, opColor);
+	undoMove(board, move, &history);
+
+	return value;
 }
 
 
