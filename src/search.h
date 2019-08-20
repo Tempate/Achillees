@@ -15,7 +15,6 @@ typedef struct {
 
 Move search(Board *board);
 
-const int alphabeta(Board *board, const int depth, int alpha, int beta, const int nullmove);
-
+const int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove);
 
 #endif /* SRC_SEARCH_H_ */

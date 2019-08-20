@@ -12,23 +12,34 @@
 #include "hashtables.h"
 
 
-static PV generatePV(Board board);
-
 static const int qsearch(Board *board, int alpha, const int beta);
+
+static void moveOrdering(const Board *board, Move *moves, const int nMoves);
+
+static void initKillerMoves(void);
+static void saveKillerMove(const Move *move, const int ply);
 
 static void timeManagement(const Board *board);
 
-static void moveOrdering(const Board *board, Move *moves, const int nMoves);
+static PV generatePV(Board board);
+
 static void insertionSort(Move *list, const int n);
 
 clock_t start;
 uint64_t nodes;
 
+Move killerMoves[MAX_GAME_LENGTH][2];
+
+
+int instantBetaCutoffs = 0;
+int betaCutoffs = 0;
+
 Move search(Board *board) {
 	Move bestMove;
 
-	timeManagement(board);
+	initKillerMoves();
 
+	timeManagement(board);
 	start = clock();
 
 	const int index = board->key % HASHTABLE_MAX_SIZE;
@@ -48,6 +59,8 @@ Move search(Board *board) {
 		infoString(board, &pv, score, depth, duration, nodes);
 	}
 
+	printf("Beta cutoff rate: %.4f\n", (float) instantBetaCutoffs / betaCutoffs);
+
 	assert(bestMove.to != bestMove.from);
 
 	return bestMove;
@@ -59,7 +72,7 @@ Move search(Board *board) {
  * alpha is the value to maximize and beta the value to minimize.
  * The initial position must have >= 1 legal moves and the initial depth must be >= 1.
  */
-const int alphabeta(Board *board, const int depth, int alpha, int beta, const int nullmove) {
+const int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	assert(beta >= alpha);
 	assert(depth >= 0);
 
@@ -72,6 +85,11 @@ const int alphabeta(Board *board, const int depth, int alpha, int beta, const in
 	}
 
 	++nodes;
+
+	const int in_check = inCheck(board);
+
+	if (in_check)
+		++depth;
 
 	if (depth == 0)
 		return qsearch(board, alpha, beta);
@@ -98,15 +116,19 @@ const int alphabeta(Board *board, const int depth, int alpha, int beta, const in
 	History history;
 
 	// Null Move Pruning
-	if (!nullmove && depth > R && !inCheck(board) && !isEndgame(board)) {
+	if (!nullmove && depth > R && !in_check && !isEndgame(board)) {
 		makeNullMove(board, &history);
-
 		const int score = -alphabeta(board, depth - 1 - R, -beta, -beta + 1, 1);
-
 		undoNullMove(board, &history);
 
-		if (score >= beta)
+		if (score >= beta) {
 			return beta;
+		}
+	}
+
+	// Futility Pruning
+	if (!nullmove && depth == 1 && !in_check && !isEndgame(board)) {
+
 	}
 
 	Move moves[MAX_MOVES];
@@ -132,8 +154,19 @@ const int alphabeta(Board *board, const int depth, int alpha, int beta, const in
 
 		if (isDraw(board)) {
 			score = 0;
+		} else if (i == 0) {
+			score = -alphabeta(board, depth - 1, -beta, -alpha, nullmove);
 		} else {
-			score = -alphabeta(board, depth-1, -beta, -alpha, nullmove);
+			int reduct = 1;
+
+			// Late move reduction
+			if (i > 4 && depth >= 3 && !in_check && !moves[i].capture && !moves[i].promotion)
+				++reduct;
+
+			score = -alphabeta(board, depth - reduct, -alpha-1, -alpha, nullmove);
+
+			if (score > alpha && score < beta)
+				score = -alphabeta(board, depth - 1, -beta, -alpha, nullmove);
 		}
 
 		freeKeyFromMemory();
@@ -148,8 +181,20 @@ const int alphabeta(Board *board, const int depth, int alpha, int beta, const in
 			if (bestScore > alpha) {
 				alpha = bestScore;
 
-				if (alpha >= beta)
+				if (alpha >= beta) {
+					// There's has been a cutoff.
+					++betaCutoffs;
+
+					if (i == 0)
+						++instantBetaCutoffs;
+
+					// A quiet move is one that doesn't capture anything.
+					if (!moves[i].capture) {
+						saveKillerMove(&moves[i], board->ply);
+					}
+
 					break;
+				}
 			}
 		}
 	}
@@ -201,18 +246,10 @@ static const int qsearch(Board *board, int alpha, const int beta) {
 	return alpha;
 }
 
-static void timeManagement(const Board *board) {
-	if (settings.movetime == 0) {
-		settings.movetime = (board->turn == WHITE) ? settings.wtime : settings.btime;
-		settings.movetime *= CLOCKS_PER_SEC / 50000;
-	} else {
-		settings.movetime *= CLOCKS_PER_SEC / 1000;
-	}
-}
-
 /*
  * 1. Best move from the previous PV
  * 2. MVV-LVA for captures
+ * 3. Killer moves
  */
 static void moveOrdering(const Board *board, Move *moves, const int nMoves) {
 	static const int pieceValues[6] = {100,200,200,300,400,500};
@@ -224,7 +261,9 @@ static void moveOrdering(const Board *board, Move *moves, const int nMoves) {
 	for (int i = 0; i < nMoves; ++i) {
 		if (board->key == tt[index].key && compareMoves(&pvMove, &moves[i])) {
 			moves[i].score = 1000;
+
 		} else if (moves[i].capture) {
+
 			const uint64_t toBB = square[moves[i].to];
 
 			for (int piece = PAWN; piece <= QUEEN; ++piece) {
@@ -233,14 +272,46 @@ static void moveOrdering(const Board *board, Move *moves, const int nMoves) {
 					break;
 				}
 			}
+
+		} else {
+
+			if (compareMoves(&moves[i], &killerMoves[board->ply][0])) {
+				moves[i].score = 50;
+			} else if (compareMoves(&moves[i], &killerMoves[board->ply][1])) {
+				moves[i].score = 45;
+			}
 		}
 	}
 
 	insertionSort(moves, nMoves);
 }
 
+static void initKillerMoves(void) {
+	const Move nullMove = (Move){.from=0,.to=0};
+
+	for (int i = 0; i < MAX_GAME_LENGTH; ++i) {
+		killerMoves[i][0] = nullMove;
+		killerMoves[i][1] = nullMove;
+	}
+}
+
+static void saveKillerMove(const Move *move, const int ply) {
+	killerMoves[ply][1] = killerMoves[ply][0];
+	killerMoves[ply][0] = *move;
+}
+
+
+static void timeManagement(const Board *board) {
+	if (settings.movetime == 0) {
+		settings.movetime = (board->turn == WHITE) ? settings.wtime : settings.btime;
+		settings.movetime *= CLOCKS_PER_SEC / 50000;
+	} else {
+		settings.movetime *= CLOCKS_PER_SEC / 1000;
+	}
+}
+
 /*
- *	Generates the PV line out of the moves from the TT.
+ *	Generates the PV line out of the moves from the TT.ve_num < 4 || depth < 3 || in_check || move_type == CAPTURE || move_type == QUEEN_PROMO || move_type == QUEEN_PROMO_CAPTURE)
  */
 static PV generatePV(Board board) {
 	PV pv = (PV) {.count = 0};

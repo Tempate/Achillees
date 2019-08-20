@@ -237,3 +237,27 @@ void testDraw(void) {
 	printf("\nunderpromotion f1N\n");
 	testPosition("8/2n5/1b6/8/4b1k1/8/5p1K/8 b - -", 7);
 }
+
+void testSee(void) {
+
+	Board *board = malloc(sizeof(Board));
+
+	parseFen(board, "4r3/1q4b1/3n4/5p2/4P3/8/6b1/1K6 b - -");
+	printBoard(board);
+
+	const int piece = getSmallestAttacker(board, 28, BLACK);
+
+	printf("Smallest attacker on e4: %d\n", piece);
+
+	parseFen(board, "4r3/1q4b1/3n4/5p2/4P3/5P2/2B2Nb1/1K2R3 b - -");
+	printBoard(board);
+
+	const Move move = (Move){.to=28,.from=37,.piece=PAWN,.color=BLACK, .promotion=0};
+
+	const int score = seeCapture(board, &move, BLACK);
+
+	printf("SEE score is: %d\n", score);
+
+	free(board);
+
+}
