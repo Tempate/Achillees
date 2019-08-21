@@ -20,4 +20,6 @@ enum {WHITE, BLACK};
 enum {PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
 enum {KCastle=1, QCastle=2, kCastle=4, qCastle=8};
 
+static inline int max(const int a, const int b) { return (a > b) ? a : b; }
+
 #endif /* MAIN_H_ */
