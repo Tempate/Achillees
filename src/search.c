@@ -8,28 +8,19 @@
 #include "play.h"
 #include "draw.h"
 #include "eval.h"
+#include "sort.h"
 #include "search.h"
 #include "hashtables.h"
 
 
 static const int qsearch(Board *board, int alpha, const int beta);
 
-static void moveOrdering(const Board *board, Move *moves, const int nMoves);
-
-static void initKillerMoves(void);
-static void saveKillerMove(const Move *move, const int ply);
-
 static void timeManagement(const Board *board);
 
 static PV generatePV(Board board);
 
-static void insertionSort(Move *list, const int n);
-
 clock_t start;
 uint64_t nodes;
-
-Move killerMoves[MAX_GAME_LENGTH][2];
-
 
 int instantBetaCutoffs = 0;
 int betaCutoffs = 0;
@@ -84,7 +75,7 @@ Move search(Board *board) {
 		infoString(board, &pv, score, depth, duration, nodes);
 	}
 
-	//printf("Beta cutoff rate: %.4f\n", (float) instantBetaCutoffs / betaCutoffs);
+	printf("Beta cutoff rate: %.4f\n", (float) instantBetaCutoffs / betaCutoffs);
 
 	assert(bestMove.to != bestMove.from);
 
@@ -141,8 +132,11 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 
 	History history;
 
+	const int pruning = !nullmove && !in_check && !isEndgame(board);
+
 	// Null Move Pruning
-	if (!nullmove && depth > R && !in_check && !isEndgame(board)) {
+	if (pruning && depth > R) {
+
 		makeNullMove(board, &history);
 		const int score = -alphabeta(board, depth - 1 - R, -beta, -beta + 1, 1);
 		undoNullMove(board, &history);
@@ -150,6 +144,16 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 		if (score >= beta) {
 			return beta;
 		}
+	}
+
+	// Reverse futility pruning
+	if (pruning && depth <= 3 && beta <= MAX_SCORE) {
+		const int score = eval(board);
+
+		if ((depth == 1 && score - pieceValues[KNIGHT] > beta) ||
+			(depth == 2 && score - pieceValues[ROOK]   > beta) ||
+			(depth == 3 && score - pieceValues[QUEEN]  > beta) )
+			return beta;
 	}
 
 	Move moves[MAX_MOVES];
@@ -162,12 +166,27 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 	moveOrdering(board, moves, nMoves);
 
 	Move bestMove = moves[0];
-	int bestScore = -2 * MAX_SCORE;
+	int bestScore = -INFINITY;
 
 	const int origAlpha = alpha, origBeta = beta;
+	const int newDepth = depth - 1;
 
 	for (int i = 0; i < nMoves; ++i) {
 		makeMove(board, &moves[i], &history);
+
+		// Futility pruning
+		/*
+		if (newDepth == 1 && !moves[i].capture) {
+			const int score = eval(board);
+			const int gamma = pieceValues[KNIGHT];
+
+			if (score + gamma < alpha) {
+				undoMove(board, &moves[i], &history);
+				continue;
+			}
+		}
+		*/
+
 		updateBoardKey(board, &moves[i], &history);
 		saveKeyToMemory(board->key);
 
@@ -176,18 +195,19 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 		if (isDraw(board)) {
 			score = 0;
 		} else if (i == 0) {
-			score = -alphabeta(board, depth - 1, -beta, -alpha, nullmove);
+			score = -alphabeta(board, newDepth, -beta, -alpha, nullmove);
 		} else {
-			int reduct = 1;
+			int reduct = 0;
 
 			// Late move reduction
 			if (i > 4 && depth >= 3 && !in_check && !moves[i].capture && !moves[i].promotion)
 				++reduct;
 
-			score = -alphabeta(board, depth - reduct, -alpha-1, -alpha, nullmove);
+			// PV search
+			score = -alphabeta(board, newDepth - reduct, -alpha-1, -alpha, nullmove);
 
 			if (score > alpha && score < beta)
-				score = -alphabeta(board, depth - 1, -beta, -alpha, nullmove);
+				score = -alphabeta(board, newDepth, -beta, -alpha, nullmove);
 		}
 
 		freeKeyFromMemory();
@@ -234,25 +254,33 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 }
 
 static const int qsearch(Board *board, int alpha, const int beta) {
-	const int score = eval(board);
+	const int standPat = eval(board);
 
-	if (score >= beta)
+	if (standPat >= beta)
 		return beta;
 
-	if (score > alpha)
-		alpha = score;
+	// Delta pruning
+	const int safety = pieceValues[QUEEN];
+
+	if (standPat < alpha - safety && !isEndgame(board))
+		return alpha;
+
+	if (standPat > alpha)
+		alpha = standPat;
 
 	Move moves[MAX_MOVES];
 	const int nMoves = legalMoves(board, moves);
 
+	if (nMoves == 0)
+		return alpha;
+
 	moveOrdering(board, moves, nMoves);
 
-	for (int i = 0; i < nMoves; ++i) {
-		if (!moves[i].capture)
-			continue;
+	const int start = (moves[0].capture) ? 0 : 1;
 
-		if (seeCapture(board, &moves[i], board->turn) < 0)
-			continue;
+	for (int i = start; i < nMoves; ++i) {
+		if (!moves[i].capture)
+			break;
 
 		History history;
 
@@ -268,100 +296,6 @@ static const int qsearch(Board *board, int alpha, const int beta) {
 	}
 
 	return alpha;
-}
-
-/*
- * 1. Best move from the previous PV
- * 2. MVV-LVA for captures
- * 3. Killer moves
- */
-static void moveOrdering(const Board *board, Move *moves, const int nMoves) {
-	static const int pieceValues[6] = {100,200,200,300,400,500};
-	const int opColor = 1 ^ board->turn;
-
-	const int index = board->key % HASHTABLE_MAX_SIZE;
-	Move pvMove = decompressMove(board, &tt[index].move);
-
-	for (int i = 0; i < nMoves; ++i) {
-		if (board->key == tt[index].key && compareMoves(&pvMove, &moves[i])) {
-			moves[i].score = 1000;
-
-		} else if (moves[i].capture) {
-
-			const uint64_t toBB = square[moves[i].to];
-
-			for (int piece = PAWN; piece <= QUEEN; ++piece) {
-				if (toBB & board->pieces[opColor][piece]) {
-					moves[i].score = pieceValues[piece] - pieceValues[moves[i].piece] / 10;
-					break;
-				}
-			}
-
-		} else {
-
-			if (compareMoves(&moves[i], &killerMoves[board->ply][0])) {
-				moves[i].score = 50;
-			} else if (compareMoves(&moves[i], &killerMoves[board->ply][1])) {
-				moves[i].score = 45;
-			}
-		}
-	}
-
-	insertionSort(moves, nMoves);
-}
-
-static void initKillerMoves(void) {
-	const Move nullMove = (Move){.from=0,.to=0};
-
-	for (int i = 0; i < MAX_GAME_LENGTH; ++i) {
-		killerMoves[i][0] = nullMove;
-		killerMoves[i][1] = nullMove;
-	}
-}
-
-static void saveKillerMove(const Move *move, const int ply) {
-	killerMoves[ply][1] = killerMoves[ply][0];
-	killerMoves[ply][0] = *move;
-}
-
-int see(Board *board, const int sqr, const int color) {
-	const int opColor = 1 ^ color;
-	const int from = getSmallestAttacker(board, sqr, color);
-
-	int value = 0;
-
-	/* Skip it if the square isn't attacked by more pieces. */
-	if (from != -1) {
-		const int attacker = findPiece(board, square[from], color);
-		const int pieceCaptured = findPiece(board, square[sqr], opColor);
-
-		assert(attacker >= 0 && pieceCaptured >= 0);
-
-		const Move move = (Move){.to=sqr, .from=from, .piece=attacker, .color=color, .castle=-1, .promotion=QUEEN, .capture=1};
-
-		History history;
-
-		makeMove(board, &move, &history);
-		const int score = pieceValues[pieceCaptured] - see(board, sqr, opColor);
-		value = (score > 0) ? score : 0;
-		undoMove(board, &move, &history);
-	}
-
-	return value;
-}
-
-int seeCapture(Board *board, const Move *move, const int color) {
-	const int opColor = 1 ^ color;
-
-	History history;
-
-	const int pieceCaptured = findPiece(board, square[move->to], opColor);
-
-	makeMove(board, move, &history);
-	const int value = pieceValues[pieceCaptured] - see(board, move->to, opColor);
-	undoMove(board, move, &history);
-
-	return value;
 }
 
 
@@ -410,19 +344,4 @@ static PV generatePV(Board board) {
 	return pv;
 }
 
-/*
- * Orders a list of moves by their score using insertion sort
- */
-static void insertionSort(Move *list, const int n) {
-	for (int i = 1; i < n; ++i) {
-		const Move move = list[i];
-		int j = i - 1;
 
-		while (j >= 0 && list[j].score < move.score) {
-			list[j+1] = list[j];
-			--j;
-		}
-
-		list[j+1] = move;
-	}
-}
