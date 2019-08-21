@@ -4,6 +4,7 @@
 #include "draw.h"
 #include "search.h"
 #include "uci.h"
+#include "sort.h"
 #include "hashtables.h"
 
 #include <time.h>
@@ -193,22 +194,22 @@ void testPosition(char* fen, const int depth) {
 
 void testDraw(void) {
 	printf("\n3fold Qc1\n");
-	testPosition("7k/3QQ3/8/8/8/PPP5/2q5/K7 b - -", 7);
+	testPosition("7k/3QQ3/8/8/8/PPP5/2q5/K7 b - -", 10);
 
 	printf("\n3fold Qc8\n");
-	testPosition("k7/2Q5/ppp5/8/8/8/3qq3/7K w - -", 7);
+	testPosition("k7/2Q5/ppp5/8/8/8/3qq3/7K w - -", 10);
 
 	printf("\n50moves h3\n");
-	testPosition("7k/8/R7/1R6/7K/8/7P/8 w - 49", 7);
+	testPosition("7k/8/R7/1R6/7K/8/7P/8 w - - 99 100", 7);
 
 	printf("\n50moves h6\n");
-	testPosition("8/7p/8/7k/1r6/r7/8/7K b - 49", 7);
+	testPosition("8/7p/8/7k/1r6/r7/8/7K b - - 99 100", 7);
 
 	printf("\n50moves a6\n");
-	testPosition("8/8/8/P7/8/6n1/3R4/R3K2k w Q 49", 7);
+	testPosition("8/8/8/P7/8/6n1/3R4/R3K2k w Q - 99 100", 7);
 
 	printf("\n50moves a3\n");
-	testPosition("r3k2K/3r4/6N1/8/p7/8/8/8 b q 49", 7);
+	testPosition("r3k2K/3r4/6N1/8/p7/8/8/8 b q - 99 100", 7);
 
 	printf("\nstalemate Qa7\n");
 	testPosition("k5q1/p7/8/6q1/6q1/6q1/8/Q6K w - -", 7);
@@ -239,25 +240,23 @@ void testDraw(void) {
 }
 
 void testSee(void) {
-
 	Board *board = malloc(sizeof(Board));
 
-	parseFen(board, "4r3/1q4b1/3n4/5p2/4P3/8/6b1/1K6 b - -");
+	parseFen(board, "k3r3/4r3/2b2n2/3q1pN1/4p2R/2n5/5NB1/K3R2Q w - -");
 	printBoard(board);
 
-	const int piece = getSmallestAttacker(board, 28, BLACK);
+	const int color = WHITE;
+	const int sqr = 28;
+	const int from = getSmallestAttacker(board, sqr, color);
+	const int piece = findPiece(board, square[from], color);
 
-	printf("Smallest attacker on e4: %d\n", piece);
+	const Move move = (Move){.to=sqr,.from=from,.piece=piece,.color=color, .promotion=0};
 
-	parseFen(board, "4r3/1q4b1/3n4/5p2/4P3/5P2/2B2Nb1/1K2R3 b - -");
-	printBoard(board);
+	printf("Smallest attacker: %d\n", from);
 
-	const Move move = (Move){.to=28,.from=37,.piece=PAWN,.color=BLACK, .promotion=0};
-
-	const int score = seeCapture(board, &move, BLACK);
+	const int score = seeCapture(board, &move);
 
 	printf("SEE score is: %d\n", score);
 
 	free(board);
-
 }
