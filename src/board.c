@@ -33,17 +33,15 @@ Board blankBoard() {
 }
 
 void printBoard(const Board *board) {
-	uint64_t bb;
-	int color;
-
 	for (int y = RANKS-1; y >= 0; y--) {
 		for (int x = 0; x < FILES; x++) {
-			bb = get_sqr(x,y);
+			const uint64_t bb = get_sqr(x,y);
 
 			if (board->empty & bb) {
 				printf(". ");
 			} else {
-				color = (board->players[WHITE] & bb) ? WHITE : BLACK;
+				const int color = (board->players[WHITE] & bb) ? WHITE : BLACK;
+
 				for (int j = 0; j < PIECES; j++) {
 					if (board->pieces[color][j] & bb) {
 						printf("%c ", pieceChars[j + 6*color]);
@@ -72,7 +70,7 @@ void printBoard(const Board *board) {
 	printf("\n");
 	printf("En passant: %s\n", (board->enPassant > 0) ? sqToCoord(board->enPassant) : "-");
 	printf("Fifty Moves: %d\n", board->fiftyMoves);
-	printf("Ply: %d\n\n", board->ply);;
+	printf("Ply: %d\n\n", board->ply);
 }
 
 void updateBoard(Board *board) {
@@ -143,14 +141,11 @@ void moveToText(Move move, char *text) {
 
 Move textToMove(const Board *board, char *text) {
 	Move move;
-	uint64_t fromBB;
-
-	int diff, castle;
 
 	move.from = coordToSq(text);
 	move.to = coordToSq(text + 2);
 
-	fromBB = square[move.from];
+	const uint64_t fromBB = square[move.from];
 	move.color = (fromBB & board->players[WHITE]) ? WHITE : BLACK;
 
 	if (text[4] >= 'a' && text[4] <= 'z') {
@@ -161,11 +156,11 @@ Move textToMove(const Board *board, char *text) {
 		move.promotion = 0;
 
 		if (move.piece == KING) {
-			diff = get_file(move.to) - get_file(move.from);
+			const int diff = get_file(move.to) - get_file(move.from);
 
 			// Castle
 			if (abs(diff) == 2) {
-				castle = (diff == 2) ? 1 : 2;
+				const int castle = (diff == 2) ? 1 : 2;
 				move.castle = castle << 2*move.color;
 			} else {
 				move.castle = -1;
@@ -181,9 +176,7 @@ Move textToMove(const Board *board, char *text) {
 
 // Returns the fens length
 int parseFen(Board *board, char *fen) {
-	int rank = RANKS-1, file = 0, piece;
-	uint64_t sqr;
-	int i = 0;
+	int rank = RANKS-1, file = 0, i = 0;
 
 	*board = blankBoard();
 
@@ -194,8 +187,8 @@ int parseFen(Board *board, char *fen) {
 		} else if (fen[i] >= '1' && fen[i] <= '8') {
 			file += fen[i] - '0';
 		} else {
-			piece = (int) charToPiece(fen[i]);
-			sqr = get_sqr(file, rank);
+			const int piece = (int) charToPiece(fen[i]);
+			const uint64_t sqr = get_sqr(file, rank);
 
 			if (fen[i] >= 'A' && fen[i] <= 'Z') {
 				board->pieces[WHITE][piece] |= sqr;
@@ -210,6 +203,7 @@ int parseFen(Board *board, char *fen) {
 	}
 
 	board->turn = (fen[++i] == 'w') ? WHITE : BLACK;
+	board->opponent = board->turn ^ 1;
 
 	i += 2;
 	if (fen[i] == '-') {
@@ -230,7 +224,6 @@ int parseFen(Board *board, char *fen) {
 	}
 
 	i += 2;
-
 
 	board->fiftyMoves = 0;
 
@@ -265,14 +258,13 @@ int parseFen(Board *board, char *fen) {
 }
 
 void generateFen(const Board *board, char *fen) {
-	uint64_t sqr;
-	int k = -1, blanks;
+	int k = -1;
 
 	for (int y = RANKS-1; y >= 0; y--) {
-		blanks = 0;
+		int blanks = 0;
 
 		for (int x = 0; x < FILES; x++) {
-			sqr = get_sqr(x,y);
+			const uint64_t sqr = get_sqr(x,y);
 
 			if (board->empty & sqr) {
 				++blanks;
@@ -339,15 +331,11 @@ void generateFen(const Board *board, char *fen) {
 // Bitboards
 
 void printBB(const uint64_t bb) {
-	uint64_t sqr;
-
 	printf("----------------\n");
 
 	for (int y = 7; y >= 0; y--) {
 		for (int x = 0; x < 8; x++) {
-			sqr = get_sqr(x,y);
-
-			printf("%d ", (bb & sqr) ? 1 : 0);
+			printf("%d ", (bb & get_sqr(x,y)) ? 1 : 0);
 		}
 
 		printf("\n");

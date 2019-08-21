@@ -428,10 +428,8 @@ void updateCastleKey(Board *board, const int oldCast, const int newCast) {
  * Removed the captured piece if there was one.
  */
 void defaultKeyChanges(Board *board, const Move *move, const History *history) {
-	const int color = move->color, opColor = 1 ^ color;
-
-	board->key ^= randomKeys[getOffset(color, move->piece, move->to)];
+	board->key ^= randomKeys[getOffset(move->color, move->piece, move->to)];
 
 	if (history->capture != -1)
-		board->key ^= randomKeys[getOffset(opColor, history->capture, move->to)];
+		board->key ^= randomKeys[getOffset(move->color ^ 1, history->capture, move->to)];
 }

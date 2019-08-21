@@ -15,6 +15,7 @@ typedef struct {
 	uint64_t key;
 
 	int turn;
+	int opponent;
 	int castling;
 	int enPassant;
 

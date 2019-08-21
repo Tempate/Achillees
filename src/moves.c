@@ -29,11 +29,10 @@ int legalMoves(Board *board, Move *moves) {
 
 	for (int i = 0; i < k; ++i) {
 		History history;
-		const int kingColor = board->turn;
 
 		makeMove(board, &psLegalMoves[i], &history);
 
-		if (!kingInCheck(board, board->pieces[kingColor][KING], kingColor)) {
+		if (!kingInCheck(board, board->pieces[board->opponent][KING], board->opponent)) {
 			Move move = psLegalMoves[i];
 			moves[n++] = move;
 		}
@@ -45,15 +44,14 @@ int legalMoves(Board *board, Move *moves) {
 }
 
 static int pseudoLegalMoves(const Board *board, Move *moves) {
-	const int color = board->turn;
 	int n = 0;
 
 	pawnPLMoves  (board, moves, &n);
 	knightPLMoves(board, moves, &n);
 
-	slidingPLMoves(board, moves, &n, bishopMoves, BISHOP, color);
-	slidingPLMoves(board, moves, &n, rookMoves,   ROOK,   color);
-	slidingPLMoves(board, moves, &n, queenMoves,  QUEEN,  color);
+	slidingPLMoves(board, moves, &n, bishopMoves, BISHOP, board->turn);
+	slidingPLMoves(board, moves, &n, rookMoves,   ROOK,   board->turn);
+	slidingPLMoves(board, moves, &n, queenMoves,  QUEEN,  board->turn);
 
 	kingPLMoves  (board, moves, &n);
 
@@ -170,10 +168,8 @@ static inline uint64_t wCaptLeftPawn  (const uint64_t bb, const uint64_t opPiece
 static inline uint64_t bCaptLeftPawn  (const uint64_t bb, const uint64_t opPieces) { return soWeOne(bb) & opPieces; }
 
 static void pawnPLMoves(const Board *board, Move *moves, int *n) {
-	const int color = board->turn;
-
-	const uint64_t bb = board->pieces[color][PAWN];
-	uint64_t opPieces = board->players[1 ^ color];
+	const uint64_t bb = board->pieces[board->turn][PAWN];
+	uint64_t opPieces = board->players[board->opponent];
 
 	/* Capturing en-passant is not detectable in the move itself,
 	 * so it has to be calculated on the fly.
@@ -184,18 +180,18 @@ static void pawnPLMoves(const Board *board, Move *moves, int *n) {
 	if (board->enPassant)
 		opPieces |= square[board->enPassant];
 
-	if (color == WHITE) {
+	if (board->turn == WHITE) {
 		const uint64_t singlePush = wSinglePushPawn(bb, board->empty);
-		pawnMoves(moves, n, singlePush, color, 8, 0);
-		pawnMoves(moves, n, wDoublePushPawn(singlePush, board->empty), color, 16, 0);
-		pawnMoves(moves, n, wCaptRightPawn(bb, opPieces), color, 9, 1);
-		pawnMoves(moves, n, wCaptLeftPawn (bb, opPieces), color, 7, 1);
+		pawnMoves(moves, n, singlePush, board->turn, 8, 0);
+		pawnMoves(moves, n, wDoublePushPawn(singlePush, board->empty), board->turn, 16, 0);
+		pawnMoves(moves, n, wCaptRightPawn(bb, opPieces), board->turn, 9, 1);
+		pawnMoves(moves, n, wCaptLeftPawn (bb, opPieces), board->turn, 7, 1);
 	} else {
 		const uint64_t singlePush = bSinglePushPawn(bb, board->empty);
-		pawnMoves(moves, n, singlePush, color, -8, 0);
-		pawnMoves(moves, n, bDoublePushPawn(singlePush, board->empty), color, -16, 0);
-		pawnMoves(moves, n, bCaptRightPawn(bb, opPieces), color, -7, 1);
-		pawnMoves(moves, n, bCaptLeftPawn (bb, opPieces), color, -9, 1);
+		pawnMoves(moves, n, singlePush, board->turn, -8, 0);
+		pawnMoves(moves, n, bDoublePushPawn(singlePush, board->empty), board->turn, -16, 0);
+		pawnMoves(moves, n, bCaptRightPawn(bb, opPieces), board->turn, -7, 1);
+		pawnMoves(moves, n, bCaptLeftPawn (bb, opPieces), board->turn, -9, 1);
 	}
 }
 
@@ -232,16 +228,14 @@ static void pawnMoves(Move *moves, int *n, uint64_t bb, const int color, const i
 // KNIGHT
 
 static void knightPLMoves(const Board *board, Move *moves, int *n) {
-	const int color = board->turn;
-
-	uint64_t bb = board->pieces[color][KNIGHT];
+	uint64_t bb = board->pieces[board->turn][KNIGHT];
 
 	if (bb) do {
 		const int from = bitScanForward(bb);
 		const uint64_t movesBB = knightMoves(from);
 
-		saveMoves(moves, n, KNIGHT, movesBB, from, color, 0, board->empty);
-		saveMoves(moves, n, KNIGHT, movesBB, from, color, 1, board->players[1^color]);
+		saveMoves(moves, n, KNIGHT, movesBB, from, board->turn, 0, board->empty);
+		saveMoves(moves, n, KNIGHT, movesBB, from, board->turn, 1, board->players[board->opponent]);
 	} while (unsetLSB(bb));
 }
 
@@ -260,14 +254,12 @@ static void kingPLMoves(const Board *board, Move *moves, int *n) {
 	static const uint64_t freeSqrsToCastle[4] = {0x60, 0xe, 0x6000000000000000, 0xe00000000000000};
 	static const uint64_t legalToCastle[4] = {0x20, 0x8, 0x2000000000000000, 0x800000000000000};
 
-	const int color = board->turn;
-
-	const uint64_t bb = board->pieces[color][KING];
+	const uint64_t bb = board->pieces[board->turn][KING];
 	const int from = bitScanForward(bb);
 	const uint64_t movesBB = kingMoves(from);
 
-	saveMoves(moves, n, KING, movesBB, from, color, 0, board->empty);
-	saveMoves(moves, n, KING, movesBB, from, color, 1, board->players[1^color]);
+	saveMoves(moves, n, KING, movesBB, from, board->turn, 0, board->empty);
+	saveMoves(moves, n, KING, movesBB, from, board->turn, 1, board->players[board->opponent]);
 
 	// Castling
 
@@ -279,22 +271,22 @@ static void kingPLMoves(const Board *board, Move *moves, int *n) {
 	 */
 
 	if (inCheck(board) == 0) {
-		const int kingCastle = 2*color;
+		const int kingCastle = 2 * board->turn;
 		int castle = board->castling & square[kingCastle];
 
 		if (castle && ((board->occupied & freeSqrsToCastle[kingCastle]) == 0) &&
-				(kingInCheck(board, legalToCastle[kingCastle], color) == 0))
+				(kingInCheck(board, legalToCastle[kingCastle], board->turn) == 0))
 		{
-			moves[(*n)++] = (Move){.from=from, .to=from + 2, .piece=KING, .color=color, .castle=castle, .promotion=0};
+			moves[(*n)++] = (Move){.from=from, .to=from + 2, .piece=KING, .color=board->turn, .castle=castle, .promotion=0};
 		}
 
 		const int queenCastle = kingCastle + 1;
 		castle = board->castling & square[queenCastle];
 
 		if (castle && ((board->occupied & freeSqrsToCastle[queenCastle]) == 0) &&
-				(kingInCheck(board, legalToCastle[queenCastle], color) == 0))
+				(kingInCheck(board, legalToCastle[queenCastle], board->turn) == 0))
 		{
-			moves[(*n)++] = (Move){.from=from, .to=from - 2, .piece=KING, .color=color, .castle=castle, .promotion=0};
+			moves[(*n)++] = (Move){.from=from, .to=from - 2, .piece=KING, .color=board->turn, .castle=castle, .promotion=0};
 		}
 	}
 }
