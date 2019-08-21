@@ -2,64 +2,25 @@
 #include "draw.h"
 #include "eval.h"
 
-#define BISH_PAIR			+30
-#define KNIG_PAIR			-15
-
-#define DOUB_PAWN 			-10
-#define ISOL_PAWN			-10
-#define BACK_PAWN			-8
-#define CONN_PAWN			+2
-
-#define BISH_MOBI			+2
-
-#define OPFI_ROOKS			+20
-#define SEFI_ROOKS			+10
-#define CONN_ROOKS			+15
-#define DOUB_ROOKS			+20
-
-#define CASTLED				+20
-#define CAN_CASTLE			+6
-
-#define NEAR_KING			+5
-
-
 static void countPieces(const Board *board, Count *wCount, Count *bCount);
 
 static int getPhase(const Count *wCount, const Count *bCount);
 static inline int taperedEval(const int phase, const int opening, const int endgame);
 
-
 static int pieceSquareTables(const Board *board, const int phase, const int color);
 
-static int pawnStructure(const Board *board, const int color);
-static int pawnScore(const uint64_t bb, const uint64_t opBB, const int color);
-
-static int rookScore     (const Board *board, const int color);
-static int connectedRooks(const Board *board);
-
-static int kingSafety   (const Board *board, const int phase, const int color);
-
 static int materialCount(const Count *count);
-static int knightScore  (const Count *count);
-static int bishopScore  (const Count *count);
 
-static int mobility(const Board *board, const int color);
-
-
-int pieceValues[6] = {100, 300, 300, 525, 900, 10000};
-
-static const uint64_t files[8] = { 0x101010101010101, 0x202020202020202, 0x404040404040404, 0x808080808080808, 0x1010101010101010, 0x2020202020202020, 0x4040404040404040, 0x8080808080808080 };
-// static const uint64_t ranks[8] = { 0xff, 0xff00, 0xff0000, 0xff000000, 0xff00000000, 0xff0000000000, 0xff000000000000, 0xff00000000000000 };
+int pieceValues[6] = {100, 325, 330, 550, 900, 10000};
 
 /*
  * Evaluates a position which has no possible moves.
  * Returns 1 on checkmate and 0 on stalemate.
  */
 int finalEval(const Board *board, const int depth) {
-	const int color = board->turn;
 	int result;
 
-	if (kingInCheck(board, board->pieces[color][KING], color)) {
+	if (kingInCheck(board, board->pieces[board->turn][KING], board->turn)) {
 		result = -MAX_SCORE - depth;
 	} else {
 		result = 0;
@@ -83,16 +44,6 @@ int eval(const Board *board) {
 
 	score += materialCount(&wCount) - materialCount(&bCount);
 	score += pieceSquareTables(board, phase, WHITE) - pieceSquareTables(board, phase, BLACK);
-
-	//score += pawnStructure(board, WHITE) - pawnStructure(board, BLACK);
-
-	// score += knightScore(&wCount) - knightScore(&bCount);
-	//score += bishopScore(&wCount) - bishopScore(&bCount);
-
-	//score += rookScore(board, WHITE)  - rookScore(board, BLACK);
-	//score += kingSafety(board, phase, WHITE) - kingSafety(board, phase, BLACK);
-
-	//score += mobility(board, WHITE) - mobility(board, BLACK);
 
 	if (board->turn == BLACK)
 		score = -score;
@@ -135,11 +86,14 @@ static int getPhase(const Count *wCount, const Count *bCount) {
 }
 
 /*
- * An endgame is considered when the side to move only has pawns.
+ * An endgame is considered when the number of pieces, excluding pawns, is less or equal than 7.
  */
 int isEndgame(const Board *board) {
-	const int color = board->turn;
-	return (board->pieces[color][KING] | board->pieces[color][PAWN]) == board->players[color];
+	Count wCount, bCount;
+
+	countPieces(board, &wCount, &bCount);
+
+	return getPhase(&wCount, &bCount) > 150;
 }
 
 static inline int taperedEval(const int phase, const int opening, const int endgame) {
@@ -193,204 +147,4 @@ static int pieceSquareTables(const Board *board, const int phase, const int colo
 	}
 
 	return taperedEval(phase, opening, endgame);
-}
-
-static int pawnStructure(const Board *board, const int color) {
-	static const uint64_t neighborPawns[8] = {0x2020202020200, 0x5050505050500, 0xa0a0a0a0a0a00, 0x14141414141400, 0x28282828282800, 0x50505050505000, 0xa0a0a0a0a0a000, 0x40404040404000};
-
-	static const uint64_t frontPawns[2][64] = {
-			{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3030303030000, 0x7070707070000, 0xe0e0e0e0e0000, 0x1c1c1c1c1c0000, 0x38383838380000, 0x70707070700000, 0xe0e0e0e0e00000, 0xc0c0c0c0c00000, 0x3030303000000, 0x7070707000000, 0xe0e0e0e000000, 0x1c1c1c1c000000, 0x38383838000000, 0x70707070000000, 0xe0e0e0e0000000, 0xc0c0c0c0000000, 0x3030300000000, 0x7070700000000, 0xe0e0e00000000, 0x1c1c1c00000000, 0x38383800000000, 0x70707000000000, 0xe0e0e000000000, 0xc0c0c000000000, 0x3030000000000, 0x7070000000000, 0xe0e0000000000, 0x1c1c0000000000, 0x38380000000000, 0x70700000000000, 0xe0e00000000000, 0xc0c00000000000, 0x3000000000000, 0x7000000000000, 0xe000000000000, 0x1c000000000000, 0x38000000000000, 0x70000000000000, 0xe0000000000000, 0xc0000000000000, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-			{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x300, 0x700, 0xe00, 0x1c00, 0x3800, 0x7000, 0xe000, 0xc000, 0x30300, 0x70700, 0xe0e00, 0x1c1c00, 0x383800, 0x707000, 0xe0e000, 0xc0c000, 0x3030300, 0x7070700, 0xe0e0e00, 0x1c1c1c00, 0x38383800, 0x70707000, 0xe0e0e000, 0xc0c0c000, 0x303030300, 0x707070700, 0xe0e0e0e00, 0x1c1c1c1c00, 0x3838383800, 0x7070707000, 0xe0e0e0e000, 0xc0c0c0c000, 0x30303030300, 0x70707070700, 0xe0e0e0e0e00, 0x1c1c1c1c1c00, 0x383838383800, 0x707070707000, 0xe0e0e0e0e000, 0xc0c0c0c0c000, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
-	};
-
-	static const int passedPawnBonus[7] = {0, 3, 10, 30, 61, 115, 218};
-
-	const uint64_t opBB = board->pieces[1 ^ color][PAWN];
-	uint64_t bb = board->pieces[color][PAWN];
-
-	int score = 0;
-
-	//score += pawnScore(bb, opBB, color);
-
-	for (int file = 0; file < FILES; ++file) {
-		const int n = popCount(files[file] & bb);
-
-		/*
-		if ((neighborPawns[file] & bb) == 0) {
-			score += ISOL_PAWN * n;
-		}
-		*/
-
-		/*
-		if (n >= 2) {
-			score += DOUB_PAWN * (n - 1);
-		}
-		*/
-	}
-
-	if (bb) do {
-		const int pawn = bitScanForward(bb);
-		const int rank = get_rank(pawn);
-
-		if ((frontPawns[color][pawn] & opBB) == 0) {
-			const int relativeRank = (color == WHITE) ? rank : 7 - rank;
-			score += passedPawnBonus[relativeRank];
-		}
-	} while (unsetLSB(bb));
-
-	return score;
-}
-
-
-static int pawnScore(const uint64_t bb, const uint64_t opBB, const int color) {
-	uint64_t stops, myAttacks, opAttacks;
-
-	int score = 0;
-
-	if (color == WHITE) {
-		stops = nortOne(bb);
-		myAttacks = noEaOne(bb) | noWeOne(bb);
-		opAttacks = soEaOne(opBB) | soWeOne(opBB);
-	} else {
-		stops = soutOne(bb);
-		myAttacks = soEaOne(bb) | soWeOne(bb);
-		opAttacks = noEaOne(opBB) | noWeOne(opBB);
-	}
-
-	/*
-	 * A backward pawn is, in this case, a pawn whose advancing square is attacked by an opponents pawn
-	 * and not defended by any of its own pawns.
-	 */
-
-	const int nBackwardPawns = popCount(stops & opAttacks & ~myAttacks);
-
-	score += BACK_PAWN * nBackwardPawns;
-
-	/*
-	 * Pawns are given a bonus for being connected
-	 */
-
-	const int nConnectedPawns = popCount(myAttacks & bb);
-
-	score += CONN_PAWN * nConnectedPawns;
-
-	return score;
-}
-
-
-static int knightScore(const Count *count) {
-	if (count->nKnights >= 2) {
-		return KNIG_PAIR;
-	}
-
-	return 0;
-}
-
-static int bishopScore(const Count *count) {
-	if (count->nBishops >= 2) {
-		return BISH_PAIR;
-	}
-
-	return 0;
-}
-
-
-static int rookScore(const Board *board, const int color) {
-	uint64_t bb = board->pieces[color][ROOK];
-
-	int score = 0;
-
-	//score += connectedRooks(board);
-
-	do {
-		const int rook = bitScanForward(bb);
-		const uint64_t file = get_file(rook);
-
-		if ((file & board->pieces[color][PAWN]) == 0) {
-			if ((file & board->pieces[1 ^ color][PAWN]) == 0) {
-				//score += OPFI_ROOKS;
-			} else {
-				//score += SEFI_ROOKS;
-			}
-		}
-	} while (unsetLSB(bb));
-
-	return score;
-}
-
-/*
- * Two rooks are connected if they are in the same file or rank
- * and there are no pieces between them.
- */
-static int connectedRooks(const Board *board) {
-	const uint64_t rooks = board->pieces[board->turn][ROOK];
-	const uint64_t rook = rooks & -rooks;
-	uint64_t aux;
-
-	// Checks to see if rooks are connected on a file
-
-	aux = rook;
-
-	do {
-		aux = nortOne(aux);
-
-		if (aux & rooks)
-			return DOUB_ROOKS;
-	} while (aux & board->empty);
-
-	// Checks to see if rooks are connected on a rank
-
-	aux = rook;
-
-	do {
-		aux = eastOne(aux);
-
-		if (aux & rooks)
-			return CONN_ROOKS;
-	} while (aux & board->empty);
-
-	return 0;
-}
-
-static int kingSafety(const Board *board, const int phase, const int color) {
-	const int index = bitScanForward(board->pieces[color][KING]);
-	const uint64_t surroundings = kingMoves(index);
-
-	int score = NEAR_KING * popCount(board->pieces[color][PAWN] & surroundings);
-
-	/*
-	if (color == WHITE) {
-		switch (index) {
-		case 2: case 6:
-			score += CASTLED;
-			break;
-		default:
-			score += CAN_CASTLE * popCount(board->castling & 3);
-		}
-	} else {
-		switch (index) {
-		case 58: case 62:
-			score += CASTLED;
-			break;
-		default:
-			score += CAN_CASTLE * popCount(board->castling & 12);
-		}
-	}
-	*/
-
-	return score;
-}
-
-static int mobility(const Board *board, const int color) {
-	int score = 0;
-
-	uint64_t bishops = board->pieces[color][BISHOP];
-
-	if (bishops) do {
-		const int bishop = bitScanForward(bishops);
-
-		score += BISH_MOBI * popCount(bishopMoves(bishop, board->occupied, board->players[board->turn]));
-	} while (unsetLSB(bishops));
-
-	return score;
 }
