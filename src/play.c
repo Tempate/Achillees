@@ -146,6 +146,21 @@ void undoMove(Board *board, const Move *move, const History *history) {
 	board->opponent ^= 1;
 }
 
+void makeShallowMove(Board *board, const Move *move, const int capturedPiece, const int captureSqr) {
+	if (move->promotion) {
+		board->pieces[move->color][PAWN] ^= square[move->from];
+		board->pieces[move->color][move->promotion] ^= square[move->to];
+	} else {
+		board->pieces[move->color][move->piece] ^= square[move->from] | square[move->to];
+	}
+
+	if (move->capture)
+		board->pieces[move->color ^ 1][capturedPiece] ^= square[captureSqr];
+
+	updateOccupancy(board);
+}
+
+
 void makeNullMove(Board *board, History *history) {
 	history->fiftyMoves = board->fiftyMoves;
 	history->enPassant  = board->enPassant;

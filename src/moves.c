@@ -12,9 +12,9 @@ static void slidingPLMoves(const Board *board, Move *moves, int *n, uint64_t (*m
 
 static void pawnMoves(Move *moves, int *n, uint64_t bb, const int color, const int shift, const int capture);
 
-static const uint64_t knightMoves(int index);
-
 static uint64_t rayAttacks(int index, uint64_t occupied, uint64_t myPieces, int bitScan(uint64_t), int dir);
+
+static uint64_t knightMoves(int index);
 
 static void saveMoves(Move *moves, int *n, const int piece, const uint64_t movesBB, const int from, const int color, const int capture, const uint64_t toBB);
 
@@ -108,11 +108,13 @@ int kingInCheck(const Board *board, const uint64_t kingBB, const int color) {
 	return 0;
 }
 
+// There are errors with this function. It needs to be tested.
 int givesCheck(Board *board, const Move *move) {
 	const int opcolor = move->color ^ 1;
 
-	const uint64_t fromBB = square[move->from], toBB = square[move->to];
+	const uint64_t toBB = square[move->to];
 	const uint64_t opKing = board->pieces[opcolor][KING];
+
 	int capture = -1, captureSqr = move->to, rookSqr = 0;
 
 	uint64_t attack = 0;
@@ -126,13 +128,6 @@ int givesCheck(Board *board, const Move *move) {
 			attack = noEaOne(move->to) | noWeOne(move->to);
 		else
 			attack = soEaOne(move->to) | soWeOne(move->to);
-
-		if (board->enPassant && board->enPassant == move->to) {
-			captureSqr = move->to + (move->color == WHITE) ? -8 : 8;
-			capture = PAWN;
-		} else {
-			capture = findPiece(board, toBB, 1 ^ move->color);
-		}
 
 		break;
 	case KNIGHT:
@@ -173,32 +168,18 @@ int givesCheck(Board *board, const Move *move) {
 		attack = rookMoves(rookSqr, board->occupied, board->players[move->color]);
 	}
 
-
 	// The only pieces that can give a discovered check are the bishop, the rook, and the queen.
-	const uint64_t sliders =
-			board->pieces[move->color][BISHOP] |
-			board->pieces[move->color][ROOK]   |
-			board->pieces[move->color][QUEEN];
+	const uint64_t bishAndQueen = board->pieces[move->color][BISHOP] | board->pieces[move->color][QUEEN];
+	const uint64_t rookAndQueen = board->pieces[move->color][ROOK]   | board->pieces[move->color][QUEEN];
 
-	// Makes the move and removes the captured piece, if any
-	board->pieces[move->color][move->piece] ^= fromBB | toBB;
+	makeShallowMove(board, move, capture, captureSqr);
 
-	if (capture != -1)
-		board->pieces[opcolor][capture] ^= square[captureSqr];
+	const uint64_t bishDiscovered = bishAndQueen && (bishAndQueen & bishopMoves(opKing, board->occupied, board->players[move->color]));
+	const uint64_t rookDiscovered = rookAndQueen && (rookAndQueen & rookMoves  (opKing, board->occupied, board->players[move->color]));
 
-	updateOccupancy(board);
+	makeShallowMove(board, move, capture, captureSqr);
 
-	const uint64_t discovered = queenMoves(opKing, board->occupied, board->players[move->color]);
-
-	// Undos the move and adds the captured piece, if any
-	board->pieces[move->color][move->piece] ^= fromBB | toBB;
-
-	if (capture != -1)
-		board->pieces[opcolor][capture] ^= square[captureSqr];
-
-	updateOccupancy(board);
-
-	return (attack & opKing) | (discovered & sliders);
+	return (attack & opKing) | bishDiscovered | rookDiscovered;
 }
 
 /*
@@ -342,7 +323,7 @@ static void knightPLMoves(const Board *board, Move *moves, int *n) {
 }
 
 // A possible optimization is to remove this function and make the lookup table a global
-static const uint64_t knightMoves(int index) {
+static uint64_t knightMoves(int index) {
 	static const uint64_t knightLookup[64] = {
 			0x20400, 0x50800, 0xa1100, 0x142200, 0x284400, 0x508800, 0xa01000, 0x402000, 0x2040004, 0x5080008, 0xa110011, 0x14220022, 0x28440044, 0x50880088, 0xa0100010, 0x40200020, 0x204000402, 0x508000805, 0xa1100110a, 0x1422002214, 0x2844004428, 0x5088008850, 0xa0100010a0, 0x4020002040, 0x20400040200, 0x50800080500, 0xa1100110a00, 0x142200221400, 0x284400442800, 0x508800885000, 0xa0100010a000, 0x402000204000,0x2040004020000, 0x5080008050000, 0xa1100110a0000, 0x14220022140000, 0x28440044280000, 0x50880088500000, 0xa0100010a00000, 0x40200020400000, 0x204000402000000, 0x508000805000000, 0xa1100110a000000, 0x1422002214000000, 0x2844004428000000, 0x5088008850000000, 0xa0100010a0000000, 0x4020002040000000, 0x400040200000000, 0x800080500000000, 0x1100110a00000000, 0x2200221400000000, 0x4400442800000000,0x8800885000000000, 0x100010a000000000, 0x2000204000000000, 0x4020000000000, 0x8050000000000, 0x110a0000000000, 0x22140000000000, 0x44280000000000, 0x88500000000000, 0x10a00000000000, 0x20400000000000
 	};
@@ -393,7 +374,7 @@ static void kingPLMoves(const Board *board, Move *moves, int *n) {
 	}
 }
 
-const uint64_t kingMoves(int index) {
+uint64_t kingMoves(int index) {
 	static const uint64_t kingLookup[64] = {
 		0x302, 0x705, 0xe0a, 0x1c14, 0x3828, 0x7050, 0xe0a0, 0xc040, 0x30203, 0x70507, 0xe0a0e, 0x1c141c, 0x382838, 0x705070, 0xe0a0e0, 0xc040c0, 0x3020300, 0x7050700, 0xe0a0e00, 0x1c141c00, 0x38283800, 0x70507000, 0xe0a0e000, 0xc040c000, 0x302030000, 0x705070000, 0xe0a0e0000, 0x1c141c0000, 0x3828380000, 0x7050700000, 0xe0a0e00000, 0xc040c00000, 0x30203000000, 0x70507000000, 0xe0a0e000000, 0x1c141c000000,0x382838000000, 0x705070000000, 0xe0a0e0000000, 0xc040c0000000, 0x3020300000000, 0x7050700000000, 0xe0a0e00000000, 0x1c141c00000000, 0x38283800000000, 0x70507000000000, 0xe0a0e000000000, 0xc040c000000000, 0x302030000000000, 0x705070000000000, 0xe0a0e0000000000, 0x1c141c0000000000, 0x3828380000000000, 0x7050700000000000, 0xe0a0e00000000000, 0xc040c00000000000, 0x203000000000000, 0x507000000000000,0xa0e000000000000, 0x141c000000000000, 0x2838000000000000, 0x5070000000000000, 0xa0e0000000000000, 0x40c0000000000000
 	};
