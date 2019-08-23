@@ -1,10 +1,8 @@
-#include "board.h"
-#include "play.h"
+#include "headers/board.h"
+#include "headers/play.h"
 
 enum {NORT, NOEA, EAST, SOEA, SOUT, SOWE, WEST, NOWE};
 
-
-static int pseudoLegalMoves(const Board *board, Move *moves);
 
 static void pawnPLMoves  (const Board *board, Move *moves, int *n);
 static void knightPLMoves(const Board *board, Move *moves, int *n);
@@ -43,7 +41,7 @@ int legalMoves(Board *board, Move *moves) {
 	return n;
 }
 
-static int pseudoLegalMoves(const Board *board, Move *moves) {
+int pseudoLegalMoves(const Board *board, Move *moves) {
 	int n = 0;
 
 	pawnPLMoves  (board, moves, &n);
@@ -69,6 +67,17 @@ int isLegalMove(Board *board, const Move *move) {
 
 	return 0;
 }
+
+/*
+int isLegalMove(Board *board, const Move *move) {
+	switch (move->piece) {
+	case PAWN:
+		break;
+	case KING:
+		break;
+	}
+}
+*/
 
 int inCheck(const Board *board) {
 	return kingInCheck(board, board->pieces[board->turn][KING], board->turn);
@@ -97,6 +106,99 @@ int kingInCheck(const Board *board, const uint64_t kingBB, const int color) {
 	}
 
 	return 0;
+}
+
+int givesCheck(Board *board, const Move *move) {
+	const int opcolor = move->color ^ 1;
+
+	const uint64_t fromBB = square[move->from], toBB = square[move->to];
+	const uint64_t opKing = board->pieces[opcolor][KING];
+	int capture = -1, captureSqr = move->to, rookSqr = 0;
+
+	uint64_t attack = 0;
+
+	// A promotion can be considered as a piece who's moving to the promoting square
+	const int piece = (move->piece == PAWN && move->promotion) ? move->promotion : move->piece;
+
+	switch (piece) {
+	case PAWN:
+		if (move->color == WHITE)
+			attack = noEaOne(move->to) | noWeOne(move->to);
+		else
+			attack = soEaOne(move->to) | soWeOne(move->to);
+
+		if (board->enPassant && board->enPassant == move->to) {
+			captureSqr = move->to + (move->color == WHITE) ? -8 : 8;
+			capture = PAWN;
+		} else {
+			capture = findPiece(board, toBB, 1 ^ move->color);
+		}
+
+		break;
+	case KNIGHT:
+		attack = knightMoves(move->to);
+		capture = findPiece(board, toBB, opcolor);
+		break;
+	case BISHOP:
+		attack = bishopMoves(move->to, board->occupied, board->players[move->color]);
+		capture = findPiece(board, toBB, opcolor);
+		break;
+	case ROOK:
+		attack = rookMoves(move->to, board->occupied, board->players[move->color]);
+		capture = findPiece(board, toBB, opcolor);
+		break;
+	case QUEEN:
+		attack = queenMoves(move->to, board->occupied, board->players[move->color]);
+		capture = findPiece(board, toBB, opcolor);
+		break;
+	case KING:
+		// Only rook checks are considered since the king can't check
+		switch (move->castle) {
+		case KCastle:
+			rookSqr = 5;
+			break;
+		case QCastle:
+			rookSqr = 3;
+			break;
+		case kCastle:
+			rookSqr = 61;
+			break;
+		case qCastle:
+			rookSqr = 59;
+			break;
+		default:
+			return 0;
+		}
+
+		attack = rookMoves(rookSqr, board->occupied, board->players[move->color]);
+	}
+
+
+	// The only pieces that can give a discovered check are the bishop, the rook, and the queen.
+	const uint64_t sliders =
+			board->pieces[move->color][BISHOP] |
+			board->pieces[move->color][ROOK]   |
+			board->pieces[move->color][QUEEN];
+
+	// Makes the move and removes the captured piece, if any
+	board->pieces[move->color][move->piece] ^= fromBB | toBB;
+
+	if (capture != -1)
+		board->pieces[opcolor][capture] ^= square[captureSqr];
+
+	updateOccupancy(board);
+
+	const uint64_t discovered = queenMoves(opKing, board->occupied, board->players[move->color]);
+
+	// Undos the move and adds the captured piece, if any
+	board->pieces[move->color][move->piece] ^= fromBB | toBB;
+
+	if (capture != -1)
+		board->pieces[opcolor][capture] ^= square[captureSqr];
+
+	updateOccupancy(board);
+
+	return (attack & opKing) | (discovered & sliders);
 }
 
 /*
