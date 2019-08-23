@@ -1,12 +1,12 @@
 #include <assert.h>
 
-#include "board.h"
-#include "play.h"
-#include "eval.h"
-#include "search.h"
-#include "hashtables.h"
+#include "headers/board.h"
+#include "headers/play.h"
+#include "headers/eval.h"
+#include "headers/search.h"
+#include "headers/hashtables.h"
 
-#include "sort.h"
+#include "headers/sort.h"
 
 static void insertionSort(Move *list, const int n);
 
@@ -17,7 +17,7 @@ static Move killerMoves[MAX_GAME_LENGTH][2];
  * 2. SEE for captures
  * 3. Killer moves
  */
-void moveOrdering(Board *board, Move *moves, const int nMoves) {
+void sort(Board *board, Move *moves, const int nMoves) {
 	const int index = board->key % HASHTABLE_MAX_SIZE;
 	Move pvMove = decompressMove(board, &tt[index].move);
 
@@ -30,11 +30,12 @@ void moveOrdering(Board *board, Move *moves, const int nMoves) {
 
 		} else {
 
-			if (compareMoves(&moves[i], &killerMoves[board->ply][0])) {
+			if (moves[i].capture)
+				moves[i].score = 60 + pieceValues[moves[i].capture];
+			else if (compareMoves(&moves[i], &killerMoves[board->ply][0]))
 				moves[i].score = 50;
-			} else if (compareMoves(&moves[i], &killerMoves[board->ply][1])) {
+			else if (compareMoves(&moves[i], &killerMoves[board->ply][1]))
 				moves[i].score = 45;
-			}
 		}
 	}
 
@@ -94,6 +95,18 @@ const int seeCapture(Board *board, const Move *move) {
 	undoMove(board, move, &history);
 
 	return value;
+}
+
+void sortByEval(Board *board, Move *moves, const int nMoves) {
+	for (int i = 0; i < nMoves; ++i) {
+		History history;
+
+		makeMove(board, &moves[i], &history);
+		moves[i].score = eval(board);
+		undoMove(board, &moves[i], &history);
+	}
+
+	insertionSort(moves, nMoves);
 }
 
 /*
