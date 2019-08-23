@@ -5,13 +5,13 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#include "board.h"
-#include "play.h"
-#include "search.h"
-#include "eval.h"
-#include "hashtables.h"
-#include "uci.h"
-#include "draw.h"
+#include "headers/board.h"
+#include "headers/play.h"
+#include "headers/search.h"
+#include "headers/eval.h"
+#include "headers/hashtables.h"
+#include "headers/uci.h"
+#include "headers/draw.h"
 
 
 static void uci(void);
@@ -59,6 +59,11 @@ void listen(void) {
 			 * Creates a second thread to search so that the UCI thread
 			 * can still reply to commands.
 			 */
+
+			if (working) {
+				pthread_join(worker, NULL);
+			}
+
 			pthread_create(&worker, NULL, bestmove, (void *) board);
 			working = 1;
 		} else if (strncmp(part, "stop", 4) == 0) {

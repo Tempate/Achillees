@@ -2,10 +2,10 @@
 #include <math.h>
 #include <assert.h>
 
-#include "main.h"
-#include "board.h"
-#include "play.h"
-#include "hashtables.h"
+#include "headers/main.h"
+#include "headers/board.h"
+#include "headers/play.h"
+#include "headers/hashtables.h"
 
 
 static const char *sqToCoord(int sq);

@@ -1,6 +1,6 @@
-#include "board.h"
-#include "play.h"
-#include "hashtables.h"
+#include "headers/board.h"
+#include "headers/play.h"
+#include "headers/hashtables.h"
 
 
 void checkCapture(Board *board, History *history, const int index, const int color);

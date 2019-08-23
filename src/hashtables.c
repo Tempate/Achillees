@@ -1,7 +1,7 @@
-#include "board.h"
-#include "moves.h"
-#include "play.h"
-#include "hashtables.h"
+#include "headers/board.h"
+#include "headers/moves.h"
+#include "headers/play.h"
+#include "headers/hashtables.h"
 
 
 int getOffset(const int color, const int piece, const int sqr);

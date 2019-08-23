@@ -12,6 +12,7 @@ C_SRCS += \
 ../src/moves.c \
 ../src/play.c \
 ../src/search.c \
+../src/sort.c \
 ../src/tests.c \
 ../src/uci.c 
 
@@ -24,6 +25,7 @@ OBJS += \
 ./src/moves.o \
 ./src/play.o \
 ./src/search.o \
+./src/sort.o \
 ./src/tests.o \
 ./src/uci.o 
 
@@ -36,6 +38,7 @@ C_DEPS += \
 ./src/moves.d \
 ./src/play.d \
 ./src/search.d \
+./src/sort.d \
 ./src/tests.d \
 ./src/uci.d 
 
@@ -44,7 +47,7 @@ C_DEPS += \
 src/%.o: ../src/%.c
 	@echo 'Building file: $<'
 	@echo 'Invoking: Cross GCC Compiler'
-	gcc -O3 -Wall -c -fmessage-length=0 -pthread -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
+	gcc -std=c11 -O3 -Wall -c -fmessage-length=0 -pthread -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

@@ -1,7 +1,7 @@
-#include "main.h"
-#include "board.h"
-#include "tests.h"
-#include "uci.h"
+#include "headers/main.h"
+#include "headers/board.h"
+#include "headers/tests.h"
+#include "headers/uci.h"
 
 #define INITIAL "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 

@@ -27,11 +27,14 @@ typedef struct {
 } History;
 
 int legalMoves(Board *board, Move *moves);
+int pseudoLegalMoves(const Board *board, Move *moves);
+
 int isLegalMove(Board *board, const Move *move);
 
 int inCheck(const Board *board);
 int kingInCheck(const Board *board, const uint64_t kingBB, const int color);
 
+int givesCheck(Board *board, const Move *move);
 int getSmallestAttacker(Board *board, const int sqr, const int color);
 
 uint64_t bishopMoves(int index, uint64_t occupied, uint64_t myPieces);

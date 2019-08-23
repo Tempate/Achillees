@@ -1,11 +1,11 @@
-#include "board.h"
-#include "draw.h"
+#include "headers/board.h"
+#include "headers/draw.h"
 
 
 static int threeFoldRepetition(const Board *board);
 static int insufficientMaterial(const Board *board);
 
-Memory memory = (Memory) { .size = 0 };
+Memory memory = {.size = 0};
 
 int isDraw(const Board *board) {
 	if (threeFoldRepetition(board)) {

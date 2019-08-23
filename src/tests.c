@@ -1,11 +1,11 @@
 
-#include "board.h"
-#include "play.h"
-#include "draw.h"
-#include "search.h"
-#include "uci.h"
-#include "sort.h"
-#include "hashtables.h"
+#include "headers/board.h"
+#include "headers/play.h"
+#include "headers/draw.h"
+#include "headers/search.h"
+#include "headers/uci.h"
+#include "headers/sort.h"
+#include "headers/hashtables.h"
 
 #include <time.h>
 #include <string.h>
