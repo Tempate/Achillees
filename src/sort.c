@@ -30,9 +30,7 @@ void sort(Board *board, Move *moves, const int nMoves) {
 
 		} else {
 
-			if (moves[i].capture)
-				moves[i].score = 60 + pieceValues[moves[i].capture];
-			else if (compareMoves(&moves[i], &killerMoves[board->ply][0]))
+			if (compareMoves(&moves[i], &killerMoves[board->ply][0]))
 				moves[i].score = 50;
 			else if (compareMoves(&moves[i], &killerMoves[board->ply][1]))
 				moves[i].score = 45;
@@ -56,7 +54,7 @@ void saveKillerMove(const Move *move, const int ply) {
 	killerMoves[ply][0] = *move;
 }
 
-const int see(Board *board, const int sqr) {
+int see(Board *board, const int sqr) {
 	const int color = board->turn;
 	const int from = getSmallestAttacker(board, sqr, color);
 
@@ -85,7 +83,7 @@ const int see(Board *board, const int sqr) {
 	return value;
 }
 
-const int seeCapture(Board *board, const Move *move) {
+int seeCapture(Board *board, const Move *move) {
 	History history;
 
 	const int pieceCaptured = findPiece(board, square[move->to], 1 ^ board->turn);
