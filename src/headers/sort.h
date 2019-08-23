@@ -13,8 +13,8 @@ void sort(Board *board, Move *moves, const int nMoves);
 void initKillerMoves(void);
 void saveKillerMove(const Move *move, const int ply);
 
-const int see(Board *board, const int sqr);
-const int seeCapture(Board *board, const Move *move);
+int see(Board *board, const int sqr);
+int seeCapture(Board *board, const Move *move);
 
 void sortByEval(Board *board, Move *moves, const int nMoves);
 

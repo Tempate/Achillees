@@ -41,7 +41,7 @@ uint64_t bishopMoves(int index, uint64_t occupied, uint64_t myPieces);
 uint64_t rookMoves  (int index, uint64_t occupied, uint64_t myPieces);
 uint64_t queenMoves (int index, uint64_t occupied, uint64_t myPieces);
 
-const uint64_t kingMoves(int index);
+uint64_t kingMoves(int index);
 
 int compareMoves(const Move *moveA, const Move *moveB);
 
