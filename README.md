@@ -17,21 +17,25 @@ You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
 ### Search
 - AlphaBeta Pruning
 - Transposition Table
-
-- Move ordering
-  1. PV-bonus
-  2. Captures with SEE >= 0
-  3. Killer moves
-  4. Captures with SEE < 0
-
+- Time management
 - Quiescence search
 - Check extensions
 - Late move reduction
 - Aspiration windows
 
-- Null move pruning
-- Delta pruning
-- Reverse futility pruning
+- Move ordering
+  1. PV-bonus
+  2. Captures with SEE >= 0 and promotions
+  3. Killer moves
+  4. Captures with SEE < 0
+
+- Pruning
+  - Razoring
+  - Delta pruning
+  - Null move pruning
+  - Static null move pruning
+  - Futility pruning
+  - Reverse futility pruning
 
 ## Running the code
 

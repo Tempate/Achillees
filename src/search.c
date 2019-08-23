@@ -2,28 +2,26 @@
 #include <time.h>
 #include <string.h>
 
-#include "board.h"
-#include "uci.h"
-#include "moves.h"
-#include "play.h"
-#include "draw.h"
-#include "eval.h"
-#include "sort.h"
-#include "search.h"
-#include "hashtables.h"
+#include "headers/board.h"
+#include "headers/uci.h"
+#include "headers/moves.h"
+#include "headers/play.h"
+#include "headers/draw.h"
+#include "headers/eval.h"
+#include "headers/sort.h"
+#include "headers/search.h"
+#include "headers/hashtables.h"
 
 
-static const int qsearch(Board *board, int alpha, const int beta);
+static const int qsearch(Board *board, int alpha, int beta);
 
 static void timeManagement(const Board *board);
 
 static PV generatePV(Board board);
 
 clock_t start;
-uint64_t nodes;
 
-int instantBetaCutoffs = 0;
-int betaCutoffs = 0;
+Stats stats = (Stats){};
 
 Move search(Board *board) {
 	Move bestMove;
@@ -39,7 +37,8 @@ Move search(Board *board) {
 	int score;
 
 	for (int depth = 1; depth <= settings.depth; ++depth) {
-		nodes = 0;
+
+		delta = 15;
 
 		// Aspiration window
 		if (depth >= 6) {
@@ -72,10 +71,13 @@ Move search(Board *board) {
 		PV pv = generatePV(*board);
 
 		const long duration = 1000 * (clock() - start) / CLOCKS_PER_SEC;
-		infoString(board, &pv, score, depth, duration, nodes);
+		infoString(board, &pv, score, depth, duration, stats.nodes);
 	}
 
-	printf("Beta cutoff rate: %.4f\n", (float) instantBetaCutoffs / betaCutoffs);
+	#ifdef DEBUG
+	fprintf(stdout, "Beta-cutoff rate: %.4f\n", (float) stats.instCutoffs / stats.betaCutoffs);
+	fflush(stdout);
+	#endif
 
 	assert(bestMove.to != bestMove.from);
 
@@ -89,9 +91,6 @@ Move search(Board *board) {
  * The initial position must have >= 1 legal moves and the initial depth must be >= 1.
  */
 const int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) {
-	assert(beta >= alpha);
-	assert(depth >= 0);
-
 	if (settings.stop)
 		return 0;
 
@@ -100,15 +99,13 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 		return 0;
 	}
 
-	++nodes;
+	++stats.nodes;
 
-	const int in_check = inCheck(board);
+	const int incheck = inCheck(board);
 
-	// Check extensions
-	if (in_check)
+	if (incheck) 			// Check extensions
 		++depth;
-
-	if (depth == 0)
+	else if (depth == 0) 	// Quiescence search
 		return qsearch(board, alpha, beta);
 
 	const int index = board->key % HASHTABLE_MAX_SIZE;
@@ -132,28 +129,40 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 
 	History history;
 
-	const int pruning = !nullmove && !in_check && !isEndgame(board);
+	const int staticEval = eval(board);
 
-	// Null Move Pruning
-	if (pruning && depth > R) {
+	if (!nullmove && !incheck && !isEndgame(board)) {
 
-		makeNullMove(board, &history);
-		const int score = -alphabeta(board, depth - 1 - R, -beta, -beta + 1, 1);
-		undoNullMove(board, &history);
-
-		if (score >= beta) {
-			return beta;
+		// Razoring
+		if (depth == 1 && staticEval + pieceValues[ROOK] < alpha) {
+			return qsearch(board, alpha, beta);
 		}
-	}
 
-	// Reverse futility pruning
-	if (pruning && depth <= 3 && beta <= MAX_SCORE) {
-		const int score = eval(board);
+		// Static null move pruning
+		if (depth <= 6 && staticEval - pieceValues[PAWN] * depth > beta) {
+			return staticEval;
+		}
 
-		if ((depth == 1 && score - pieceValues[KNIGHT] > beta) ||
-			(depth == 2 && score - pieceValues[ROOK]   > beta) ||
-			(depth == 3 && score - pieceValues[QUEEN]  > beta) )
-			return beta;
+		// Null move pruning
+		if (depth > R) {
+			makeNullMove(board, &history);
+			const int score = -alphabeta(board, depth - 1 - R, -beta, -beta + 1, 1);
+			undoNullMove(board, &history);
+
+			if (score >= beta)
+				return beta;
+		}
+
+		// Reverse futility pruning
+		if (depth <= 3 && beta <= MAX_SCORE) {
+			if (depth == 1 && staticEval - pieceValues[KNIGHT] >= beta)
+				return beta;
+			else if (depth == 2 && staticEval - pieceValues[ROOK] >= beta)
+				return beta;
+			else if (depth == 3 && staticEval - pieceValues[QUEEN] >= beta)
+				// Razoring tests where depth is decrease don't seem to improve it
+				return beta;
+		}
 	}
 
 	Move moves[MAX_MOVES];
@@ -163,7 +172,7 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 	if (nMoves == 0)
 		return finalEval(board, depth);
 
-	moveOrdering(board, moves, nMoves);
+	sort(board, moves, nMoves);
 
 	Move bestMove = moves[0];
 	int bestScore = -INFINITY;
@@ -171,21 +180,17 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 	const int origAlpha = alpha, origBeta = beta;
 	const int newDepth = depth - 1;
 
+	static const int futMargins[] = {200, 300, 500};
+	const int futPrun = depth <= 3 && !incheck && staticEval + futMargins[depth-1] <= alpha;
+
 	for (int i = 0; i < nMoves; ++i) {
 		makeMove(board, &moves[i], &history);
 
-		// Futility pruning
-		/*
-		if (newDepth == 1 && !moves[i].capture) {
-			const int score = eval(board);
-			const int gamma = pieceValues[KNIGHT];
-
-			if (score + gamma < alpha) {
-				undoMove(board, &moves[i], &history);
-				continue;
-			}
+		// Futility Pruning
+		if (futPrun && i != 0 && !moves[i].capture && !moves[i].promotion && !inCheck(board)) {
+			undoMove(board, &moves[i], &history);
+			continue;
 		}
-		*/
 
 		updateBoardKey(board, &moves[i], &history);
 		saveKeyToMemory(board->key);
@@ -200,7 +205,7 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 			int reduct = 0;
 
 			// Late move reduction
-			if (i > 4 && depth >= 3 && !in_check && !moves[i].capture && !moves[i].promotion)
+			if (i > 4 && depth >= 3 && !incheck && !moves[i].capture && !moves[i].promotion)
 				++reduct;
 
 			// PV search
@@ -214,7 +219,7 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 		updateBoardKey(board, &moves[i], &history);
 		undoMove(board, &moves[i], &history);
 
-		// Updates the best value and pruns the tree when alpha >= beta
+		// Updates the best value and prunes the tree when alpha >= beta
 		if (score > bestScore) {
 			bestScore = score;
 			bestMove = moves[i];
@@ -223,16 +228,18 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 				alpha = bestScore;
 
 				if (alpha >= beta) {
-					// There's has been a cutoff.
-					++betaCutoffs;
 
-					if (i == 0)
-						++instantBetaCutoffs;
-
-					// A quiet move is one that doesn't capture anything.
 					if (!moves[i].capture) {
+						// Killer moves are moves that produce a cutoff despite being quiet
 						saveKillerMove(&moves[i], board->ply);
 					}
+
+					#ifdef DEBUG
+					++stats.betaCutoffs;
+
+					if (i == 0)
+						++stats.instCutoffs;
+					#endif
 
 					break;
 				}
@@ -253,20 +260,18 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 	return bestScore;
 }
 
-static const int qsearch(Board *board, int alpha, const int beta) {
+static const int qsearch(Board *board, int alpha, int beta) {
 	const int standPat = eval(board);
 
 	if (standPat >= beta)
 		return beta;
 
 	// Delta pruning
-	const int safety = pieceValues[QUEEN];
-
-	if (standPat < alpha - safety && !isEndgame(board))
+	if (standPat + pieceValues[QUEEN] < alpha && !isEndgame(board))
 		return alpha;
-
-	if (standPat > alpha)
+	else if (standPat > alpha)
 		alpha = standPat;
+
 
 	Move moves[MAX_MOVES];
 	const int nMoves = legalMoves(board, moves);
@@ -274,12 +279,11 @@ static const int qsearch(Board *board, int alpha, const int beta) {
 	if (nMoves == 0)
 		return alpha;
 
-	moveOrdering(board, moves, nMoves);
+	sort(board, moves, nMoves);
 
-	const int start = (moves[0].capture) ? 0 : 1;
-
-	for (int i = start; i < nMoves; ++i) {
-		if (!moves[i].capture)
+	for (int i = 0; i < nMoves; ++i) {
+		// Prunes quiet moves (excluding promotions) and moves with negative SEE
+		if (moves[i].score < 60)
 			break;
 
 		History history;
@@ -300,23 +304,34 @@ static const int qsearch(Board *board, int alpha, const int beta) {
 
 
 static void timeManagement(const Board *board) {
-	if (settings.movetime == 0) {
-		settings.movetime = (board->turn == WHITE) ? settings.wtime : settings.btime;
-		settings.movetime *= CLOCKS_PER_SEC / 50000;
+	if (!settings.movetime) {
+		clock_t remaining, increment;
+
+		if (board->turn == WHITE) {
+			remaining = settings.wtime;
+			increment = settings.winc;
+		} else {
+			remaining = settings.btime;
+			increment = settings.binc;
+		}
+
+		if (remaining || increment) {
+			const clock_t timeToMove = min(remaining >> 2, ((remaining - 20) >> 5) + increment);
+			settings.movetime = (timeToMove * CLOCKS_PER_SEC) / 1000;
+		}
 	} else {
 		settings.movetime *= CLOCKS_PER_SEC / 1000;
 	}
 }
 
-/*
- *	Generates the PV line out of the moves from the TT.ve_num < 4 || depth < 3 || in_check || move_type == CAPTURE || move_type == QUEEN_PROMO || move_type == QUEEN_PROMO_CAPTURE)
- */
+// Finds the PV line from the TT. Due to collisions, it sometimes can be incomplete.
 static PV generatePV(Board board) {
 	PV pv = (PV) {.count = 0};
 
 	while (1) {
 		const int index = board.key % HASHTABLE_MAX_SIZE;
 
+		// There's been a collision
 		if (board.key != tt[index].key)
 			break;
 
