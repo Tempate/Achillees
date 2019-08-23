@@ -13,7 +13,7 @@
 #include "headers/hashtables.h"
 
 
-static const int qsearch(Board *board, int alpha, int beta);
+static int qsearch(Board *board, int alpha, int beta);
 
 static void timeManagement(const Board *board);
 
@@ -90,7 +90,7 @@ Move search(Board *board) {
  * alpha is the value to maximize and beta the value to minimize.
  * The initial position must have >= 1 legal moves and the initial depth must be >= 1.
  */
-const int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) {
+int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	if (settings.stop)
 		return 0;
 
@@ -184,14 +184,13 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 	const int futPrun = depth <= 3 && !incheck && staticEval + futMargins[depth-1] <= alpha;
 
 	for (int i = 0; i < nMoves; ++i) {
-		makeMove(board, &moves[i], &history);
 
 		// Futility Pruning
-		if (futPrun && i != 0 && !moves[i].capture && !moves[i].promotion && !inCheck(board)) {
-			undoMove(board, &moves[i], &history);
+		if (futPrun && i != 0 && !moves[i].capture && !moves[i].promotion) {
 			continue;
 		}
 
+		makeMove(board, &moves[i], &history);
 		updateBoardKey(board, &moves[i], &history);
 		saveKeyToMemory(board->key);
 
@@ -260,7 +259,7 @@ const int alphabeta(Board *board, int depth, int alpha, int beta, const int null
 	return bestScore;
 }
 
-static const int qsearch(Board *board, int alpha, int beta) {
+static int qsearch(Board *board, int alpha, int beta) {
 	const int standPat = eval(board);
 
 	if (standPat >= beta)
@@ -358,5 +357,3 @@ static PV generatePV(Board board) {
 
 	return pv;
 }
-
-
