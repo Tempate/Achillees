@@ -9,30 +9,6 @@ void removeCastlingForRook(Board *board, const int index, const int color);
 const int castleLookup[4][3] = {{6, 7, 5}, {2, 0, 3}, {62, 63, 61}, {58, 56, 59}};
 
 
-long perft(Board *board, const int depth) {
-	Move moves[MAX_MOVES];
-
-	long nodes = 0;
-
-	if (depth == 1) {
-		nodes = legalMoves(board, moves);
-	} else {
-		const int newDepth = depth - 1;
-		const int k = legalMoves(board, moves);
-
-		for (int i = 0; i < k; ++i) {
-			History history;
-
-			makeMove(board, &moves[i], &history);
-			nodes += perft(board, newDepth);
-			undoMove(board, &moves[i], &history);
-		}
-	}
-
-	return nodes;
-}
-
-
 void makeMove(Board *board, const Move *move, History *history) {
 	static const int removeCastling[2] = {12, 3};
 	const int color = move->color, opColor = 1 ^ color;

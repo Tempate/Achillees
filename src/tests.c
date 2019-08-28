@@ -31,8 +31,10 @@ void testMakeMove(char *fen) {
 	free(board);
 }
 
-void testMoves(char *fen, const int depth) {
-	Board *board = malloc(sizeof(Board));
+void testPerft(Board *board, const int depth) {
+	fprintf(stdout, "\n");
+	fflush(stdout);
+
 	Move moves[MAX_MOVES];
 	History history;
 
@@ -40,9 +42,6 @@ void testMoves(char *fen, const int depth) {
 	int k, r, s = 0;
 
 	time_t start = clock();
-
-	parseFen(board, fen);
-	printBoard(board);
 
 	k = legalMoves(board, moves);
 
@@ -60,15 +59,13 @@ void testMoves(char *fen, const int depth) {
 		undoMove(board, &moves[i], &history);
 	}
 
-	printf("\n");
-	printf("Time: %.4f\n", (double)(clock() - start)/CLOCKS_PER_SEC);
-	printf("Moves: %d\n", k);
-	printf("Nodes: %d\n", s);
-
-	free(board);
+	fprintf(stdout, "\nTime: %.4f\n", (double)(clock() - start)/CLOCKS_PER_SEC);
+	fprintf(stdout, "Moves: %d\n", k);
+	fprintf(stdout, "Nodes: %d\n\n", s);
+	fflush(stdout);
 }
 
-void testPerft(const char* filename, const int depth) {
+void testPerftFile(const char* filename, const int depth) {
 	Board board;
 	FILE *ifp;
 
