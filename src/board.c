@@ -4,6 +4,7 @@
 
 #include "headers/main.h"
 #include "headers/board.h"
+#include "headers/draw.h"
 #include "headers/play.h"
 #include "headers/hashtables.h"
 
@@ -19,6 +20,11 @@ const char pieceChars[12] = {'P','N','B','R','Q','K','p','n','b','r','q','k'};
 
 // BOARD
 
+void initialBoard(Board *board) {
+	static char* initial = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+	parseFen(board, initial);
+}
+
 Board blankBoard() {
 	Board board = (Board) {
 		.empty = ~0,
@@ -33,6 +39,8 @@ Board blankBoard() {
 }
 
 void printBoard(const Board *board) {
+	printf("\n");
+
 	for (int y = RANKS-1; y >= 0; y--) {
 		for (int x = 0; x < FILES; x++) {
 			const uint64_t bb = get_sqr(x,y);
@@ -71,6 +79,25 @@ void printBoard(const Board *board) {
 	printf("En passant: %s\n", (board->enPassant > 0) ? sqToCoord(board->enPassant) : "-");
 	printf("Fifty Moves: %d\n", board->fiftyMoves);
 	printf("Ply: %d\n\n", board->ply);
+}
+
+void moves(Board *board, char *moves) {
+	char *rest;
+	rest = moves;
+
+	char *moveText;
+
+	while ((moveText = strtok_r(rest, " ", &rest))) {
+		const Move move = textToMove(board, moveText);
+
+		History history;
+
+		makeMove(board, &move, &history);
+		updateBoardKey(board, &move, &history);
+		saveKeyToMemory(board->key);
+
+		assert(board->key == zobristKey(board));
+	}
 }
 
 void updateBoard(Board *board) {

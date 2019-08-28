@@ -14,19 +14,10 @@ static int materialCount(const Count *count);
 int pieceValues[6] = {100, 325, 330, 550, 900, 10000};
 
 /*
- * Evaluates a position which has no possible moves.
- * Returns 1 on checkmate and 0 on stalemate.
+ * Evaluates a position that has no possible moves.
  */
 int finalEval(const Board *board, const int depth) {
-	int result;
-
-	if (kingInCheck(board, board->pieces[board->turn][KING], board->turn)) {
-		result = -MAX_SCORE - depth;
-	} else {
-		result = 0;
-	}
-
-	return result;
+	return inCheck(board) ? -MAX_SCORE - depth : 0;
 }
 
 /*
@@ -51,6 +42,9 @@ int eval(const Board *board) {
 	return score;
 }
 
+/*
+ * Two structures are generated to save recomputing pop counts later on.
+ */
 static void countPieces(const Board *board, Count *wCount, Count *bCount) {
 	wCount->nPawns   = popCount(board->pieces[WHITE][PAWN]);
 	wCount->nKnights = popCount(board->pieces[WHITE][KNIGHT]);
@@ -67,7 +61,10 @@ static void countPieces(const Board *board, Count *wCount, Count *bCount) {
 	bCount->nTotal   = popCount(board->players[BLACK]);
 }
 
-
+/*
+ * Returns the fase of the game with a number ranging from 1 to 256.
+ * The higher the number, the more advanced the game is.
+ */
 static int getPhase(const Count *wCount, const Count *bCount) {
     const int knightPhase = 1;
     const int bishopPhase = 1;
@@ -85,9 +82,6 @@ static int getPhase(const Count *wCount, const Count *bCount) {
     return (phase * 256 + (totalPhase / 2)) / totalPhase;
 }
 
-/*
- * An endgame is considered when the number of pieces, excluding pawns, is less or equal than 7.
- */
 int isEndgame(const Board *board) {
 	Count wCount, bCount;
 
@@ -96,6 +90,10 @@ int isEndgame(const Board *board) {
 	return getPhase(&wCount, &bCount) > 150;
 }
 
+/*
+ * It gives weights to the opening/middle-game evaluation and the endgame
+ * based on the phase.
+ */
 static inline int taperedEval(const int phase, const int opening, const int endgame) {
 	return ((opening * (256 - phase)) + (endgame * phase)) / 256;
 }

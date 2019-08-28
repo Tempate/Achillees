@@ -4,8 +4,6 @@
 
 extern const int castleLookup[4][3];
 
-long perft(Board *board, const int depth);
-
 void makeMove(Board *board, const Move *move, History *history);
 void undoMove(Board *board, const Move *move, const History *history);
 

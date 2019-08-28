@@ -16,11 +16,35 @@
 
 extern uint64_t square[64];
 
+typedef struct {
+	int stop;
+
+	int depth;
+	int nodes;
+	int mate;
+
+	int wtime;
+	int btime;
+	int winc;
+	int binc;
+
+	int movestogo;
+	int movetime;
+} Settings;
+
+extern Settings settings;
+
 enum {WHITE, BLACK};
 enum {PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
 enum {KCastle=1, QCastle=2, kCastle=4, qCastle=8};
 
 static inline int max(const int a, const int b) { return (a > b) ? a : b; }
 static inline int min(const int a, const int b) { return (a < b) ? a : b; }
+
+#include "board.h"
+
+void defaultSettings(Settings *settings);
+void evaluate(const Board *board);
+void *bestmove(void *args);
 
 #endif /* MAIN_H_ */

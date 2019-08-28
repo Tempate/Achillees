@@ -38,9 +38,9 @@ Move search(Board *board) {
 
 	for (int depth = 1; depth <= settings.depth; ++depth) {
 
+		// Aspiration window
 		delta = 15;
 
-		// Aspiration window
 		if (depth >= 6) {
 			alpha = score - delta;
 			beta = score + delta;

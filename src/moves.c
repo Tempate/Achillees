@@ -56,6 +56,31 @@ int pseudoLegalMoves(const Board *board, Move *moves) {
 	return n;
 }
 
+/*
+ * Counts all the legal moves of the tree
+ */
+long perft(Board *board, int depth) {
+	Move moves[MAX_MOVES];
+	const int nMoves = legalMoves(board, moves);
+
+	if (depth == 1)
+		return nMoves;
+
+	--depth;
+	long nodes = 0;
+
+	for (int i = 0; i < nMoves; ++i) {
+		History history;
+
+		makeMove(board, &moves[i], &history);
+		nodes += perft(board, depth);
+		undoMove(board, &moves[i], &history);
+	}
+
+	return nodes;
+}
+
+// TODO: This function needs to be improved.
 int isLegalMove(Board *board, const Move *move) {
 	Move moves[MAX_MOVES];
 	const int nMoves = legalMoves(board, moves);

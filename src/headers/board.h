@@ -1,7 +1,7 @@
 #ifndef BOARD_H_
 #define BOARD_H_
 
-#include "main.h"
+#include <inttypes.h>
 
 #define unsetLSB(bb) bb &= bb - 1
 
@@ -22,6 +22,8 @@ typedef struct {
 	int fiftyMoves;
 	int ply;
 } Board;
+
+#include "main.h"
 
 static const uint64_t notAFile = 0xfefefefefefefefe; // ~0x0101010101010101
 static const uint64_t notHFile = 0x7f7f7f7f7f7f7f7f; // ~0x8080808080808080
@@ -49,13 +51,17 @@ static inline int  bitScanReverse (uint64_t bb)  { return 63 - __builtin_clzll(b
 
 static inline int  sameParity(const int a, const int b) { return ((a ^ b) & 1) == 0; }
 
+
 #include "moves.h"
 
+void initialBoard(Board *board);
 Board blankBoard();
 
 void printBoard(const Board *board);
 void updateBoard(Board *board);
 void updateOccupancy(Board *board);
+
+void moves(Board *board, char *moves);
 
 void setBits  (Board *board, const int color, const int piece, const int index);
 void unsetBits(Board *board, const int color, const int piece, const int index);

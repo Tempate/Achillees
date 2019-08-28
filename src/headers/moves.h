@@ -29,6 +29,8 @@ typedef struct {
 int legalMoves(Board *board, Move *moves);
 int pseudoLegalMoves(const Board *board, Move *moves);
 
+long perft(Board *board, int depth);
+
 int isLegalMove(Board *board, const Move *move);
 
 int inCheck(const Board *board);

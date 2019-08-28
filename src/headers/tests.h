@@ -10,8 +10,9 @@
 
 
 void testMakeMove(char *fen);
-void testMoves(char *fen, const int depth);
-void testPerft(const char* filename, const int depth);
+
+void testPerft(Board *board, const int depth);
+void testPerftFile(const char* filename, const int depth);
 
 void testKeys(void);
 

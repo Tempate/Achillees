@@ -3,25 +3,7 @@
 
 #include "search.h"
 
-typedef struct {
-	int stop;
-
-	int depth;
-	int nodes;
-	int mate;
-
-	int wtime;
-	int btime;
-	int winc;
-	int binc;
-
-	int movestogo;
-	int movetime;
-} Settings;
-
-extern Settings settings;
-
-void listen(void);
+void uci(void);
 
 void infoString(const Board *board, PV *pv, const int score, const int depth, const long time, const uint64_t nodes);
 
