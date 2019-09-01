@@ -11,10 +11,12 @@
 #define FILES 8
 #define RANKS 8
 #define PIECES 6
+#define SQRS 64
 
 #define MAX_GAME_LENGTH 1024
 
 extern uint64_t square[64];
+extern uint64_t inBetweenLookup[64][64];
 
 typedef struct {
 	int stop;
@@ -45,6 +47,5 @@ static inline int min(const int a, const int b) { return (a < b) ? a : b; }
 
 void defaultSettings(Settings *settings);
 void evaluate(const Board *board);
-void *bestmove(void *args);
 
 #endif /* MAIN_H_ */

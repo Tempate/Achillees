@@ -18,9 +18,6 @@ static void isready(void);
 static void position(Board *board, char *s);
 static void go(Board *board, Settings *settings, char *s);
 
-static void createSearchThread(Board *board);
-static void stopSearchThread(void);
-
 pthread_t worker;
 int working = 0;
 
@@ -125,10 +122,23 @@ static void go(Board *board, Settings *settings, char *s) {
 	createSearchThread(board);
 }
 
+void *bestmove(void *args) {
+	Board *board = (Board *) args;
+	char pv[6];
+
+	const Move move = search(board);
+	moveToText(move, pv);
+
+	fprintf(stdout, "bestmove %s\n", pv);
+	fflush(stdout);
+
+	return NULL;
+}
+
 void infoString(const Board *board, PV *pv, const int score, const int depth, const long duration, const uint64_t nodes) {
 	const int relativeScore = (board->turn == WHITE) ? score : -score;
 
-	fprintf(stdout, "info score cp %d depth %d time %ld nodes %ld pv ", relativeScore, depth, duration, nodes);
+	fprintf(stdout, "info score cp %d depth %d time %ld nps %d nodes %ld pv ", relativeScore, depth, duration, 1000 * nodes / (duration+1), nodes);
 
 	for (int i = 0; i < pv->count; ++i) {
 		char moveText[6];
@@ -140,7 +150,7 @@ void infoString(const Board *board, PV *pv, const int score, const int depth, co
 	fflush(stdout);
 }
 
-static void createSearchThread(Board *board) {
+void createSearchThread(Board *board) {
 	if (working)
 		pthread_join(worker, NULL);
 
@@ -148,7 +158,7 @@ static void createSearchThread(Board *board) {
 	working = 1;
 }
 
-static void stopSearchThread(void) {
+void stopSearchThread(void) {
 	settings.stop = 1;
 	pthread_join(worker, NULL);
 	working = 0;

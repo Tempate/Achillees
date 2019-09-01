@@ -31,25 +31,25 @@ void testMakeMove(char *fen) {
 	free(board);
 }
 
-void testPerft(Board *board, const int depth) {
+void testPerft(Board *board, int depth) {
 	fprintf(stdout, "\n");
 	fflush(stdout);
 
 	Move moves[MAX_MOVES];
 	History history;
 
-	const int newDepth = depth - 1;
-	int k, r, s = 0;
+	uint64_t s = 0;
 
 	time_t start = clock();
 
-	k = legalMoves(board, moves);
+	const int nMoves = legalMoves(board, moves);
+	--depth;
 
-	for (int i = 0; i < k; i++) {
+	for (int i = 0; i < nMoves; i++) {
 		makeMove(board, &moves[i], &history);
 
-		if (newDepth > 0) {
-			r = perft(board, newDepth);
+		if (depth > 0) {
+			const int r = perft(board, depth);
 			printMove(moves[i], r);
 			s += r;
 		} else {
@@ -60,56 +60,61 @@ void testPerft(Board *board, const int depth) {
 	}
 
 	fprintf(stdout, "\nTime: %.4f\n", (double)(clock() - start)/CLOCKS_PER_SEC);
-	fprintf(stdout, "Moves: %d\n", k);
-	fprintf(stdout, "Nodes: %d\n\n", s);
+	fprintf(stdout, "Moves: %d\n", nMoves);
+	fprintf(stdout, "Nodes: %" PRIu64 "\n\n", s);
 	fflush(stdout);
 }
 
-void testPerftFile(const char* filename, const int depth) {
+void testPerftFile(const int depth) {
 	Board board;
 	FILE *ifp;
 
-	char *c = malloc(85);
-	char *fen = malloc(70);
-	char *rest = malloc(15);
+	char *c = malloc(100), *fen, *rest;
+	char filename[17];
 
-	int k, len1, len2;
-	long nodes;
+	switch (depth) {
+	case 4:
+		strncpy(filename, "perft/perft4.txt", 17);
+		break;
+	case 5:
+		strncpy(filename, "perft/perft5.txt", 17);
+		break;
+	case 6:
+		strncpy(filename, "perft/perft6.txt", 17);
+		break;
+	default:
+		fprintf(stdout, "\nThe specified file is not an option. Either 4, 5, or 6.\n\n");
+		fflush(stdout);
+		return;
+	}
+
+	fprintf(stdout, "\nTesting for depth %d\n", depth);
+	fflush(stdout);
 
 	ifp = fopen(filename, "r");
 
 	if (ifp == NULL) {
-		printf("Can't open input file %s\n", filename);
+		fprintf(stdout, "There was an error opening the file %s\n", filename);
+		fflush(stdout);
 		exit(1);
 	}
 
-	while (!feof(ifp)) {
-		fgets(c, 120, ifp);
+	while (!feof(ifp) && fgets(c, 120, ifp) != NULL) {
 		fen = strtok(c, ";");
-		rest = strtok(NULL, c);
-		nodes = atoi(rest + 3);
-
-		len1 = (int) 70 - strlen(fen);
-		len2 = (int) 10 - strlen(rest);
-
-		printf("%s", fen);
-
-		for (int i = 0; i < len1; i++)
-			printf(" ");
+		rest = strtok(NULL, ";");
+		uint64_t nodes = atoi(rest + 3);
 
 		parseFen(&board, fen);
-		k = perft(&board, depth);
+		uint64_t k = perft(&board, depth);
 
-		printf("%ld \t %d", nodes, k);
-
-		for (int i = 0; i < len2; i++)
-			printf(" ");
-
-		printf("%s\n", (nodes == k) ? "PASS" : "ERROR");
+		fprintf(stdout, "%s  %s \t %ld %ld\n", (nodes == k) ? "PASS" : "FAIL", fen, nodes, k);
+		fflush(stdout);
 	}
 
-	free(rest);
-	free(fen);
+	fprintf(stdout, "\n");
+	fflush(stdout);
+
+	fclose(ifp);
 	free(c);
 }
 
