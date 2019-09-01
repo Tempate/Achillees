@@ -25,7 +25,7 @@ void sort(Board *board, Move *moves, const int nMoves) {
 		if (board->key == tt[index].key && compareMoves(&pvMove, &moves[i])) {
 			moves[i].score = INFINITY;
 
-		} else if (moves[i].capture) {
+		} else if (moves[i].type == CAPTURE) {
 			moves[i].score = 60 + seeCapture(board, &moves[i]);
 
 		} else {
@@ -55,28 +55,25 @@ void saveKillerMove(const Move *move, const int ply) {
 }
 
 int see(Board *board, const int sqr) {
-	const int color = board->turn;
-	const int from = getSmallestAttacker(board, sqr, color);
+	const int from = getSmallestAttacker(board, sqr, board->turn);
 
 	int value = 0;
 
 	/* Skip it if the square isn't attacked by more pieces. */
 	if (from != -1) {
-		const int attacker = findPiece(board, square[from], color);
-		const int pieceCaptured = findPiece(board, square[sqr], 1 ^ color);
+		const int attacker = findPiece(board, square[from], board->turn);
+		const int pieceCaptured = findPiece(board, square[sqr], board->opponent);
 
 		assert(attacker >= 0 && pieceCaptured >= 0);
 
 		const int promotion = (attacker == PAWN && (sqr < 8 || sqr >= 56)) ? QUEEN : 0;
-		const Move move = (Move){.to=sqr, .from=from, .piece=attacker, .color=color, .castle=-1, .promotion=promotion, .capture=1};
+		const Move move = (Move){.to=sqr, .from=from, .piece=attacker, .color=board->turn, .type=CAPTURE, .castle=-1, .promotion=promotion};
 
 		History history;
 
-		// printf("Attacker %d  From %d  To %d  Victim %d\n", attacker, from, sqr, pieceCaptured);
-
 		makeMove(board, &move, &history);
 		const int score = pieceValues[pieceCaptured] - see(board, sqr);
-		value = (score > 0) ? score : 0;
+		value = max(score, 0);
 		undoMove(board, &move, &history);
 	}
 
@@ -86,7 +83,7 @@ int see(Board *board, const int sqr) {
 int seeCapture(Board *board, const Move *move) {
 	History history;
 
-	const int pieceCaptured = findPiece(board, square[move->to], 1 ^ board->turn);
+	const int pieceCaptured = findPiece(board, square[move->to], board->opponent);
 
 	makeMove(board, move, &history);
 	const int value = pieceValues[pieceCaptured] - see(board, move->to);

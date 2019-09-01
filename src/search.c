@@ -99,14 +99,14 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 		return 0;
 	}
 
-	++stats.nodes;
-
 	const int incheck = inCheck(board);
 
 	if (incheck) 			// Check extensions
 		++depth;
 	else if (depth == 0) 	// Quiescence search
 		return qsearch(board, alpha, beta);
+
+	++stats.nodes;
 
 	const int index = board->key % HASHTABLE_MAX_SIZE;
 
@@ -154,14 +154,12 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 		}
 
 		// Reverse futility pruning
-		if (depth <= 3 && beta <= MAX_SCORE) {
-			if (depth == 1 && staticEval - pieceValues[KNIGHT] >= beta)
-				return beta;
-			else if (depth == 2 && staticEval - pieceValues[ROOK] >= beta)
-				return beta;
-			else if (depth == 3 && staticEval - pieceValues[QUEEN] >= beta)
-				// Razoring tests where depth is decrease don't seem to improve it
-				return beta;
+		if (beta <= MAX_SCORE) {
+			if (depth == 1 && staticEval - pieceValues[KNIGHT] >= beta) return beta;
+			if (depth == 2 && staticEval - pieceValues[ROOK]   >= beta) return beta;
+
+			// Razoring tests where depth is decreased don't give any elo
+			if (depth == 3 && staticEval - pieceValues[QUEEN]  >= beta) return beta;
 		}
 	}
 
@@ -186,9 +184,8 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 	for (int i = 0; i < nMoves; ++i) {
 
 		// Futility Pruning
-		if (futPrun && i != 0 && !moves[i].capture && !moves[i].promotion) {
+		if (futPrun && i != 0 && moves[i].type == QUIET && !moves[i].promotion)
 			continue;
-		}
 
 		makeMove(board, &moves[i], &history);
 		updateBoardKey(board, &moves[i], &history);
@@ -204,7 +201,7 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 			int reduct = 0;
 
 			// Late move reduction
-			if (i > 4 && depth >= 3 && !incheck && !moves[i].capture && !moves[i].promotion)
+			if (i > 4 && depth >= 3 && !incheck && moves[i].type == QUIET && !moves[i].promotion)
 				++reduct;
 
 			// PV search
@@ -228,7 +225,7 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 
 				if (alpha >= beta) {
 
-					if (!moves[i].capture) {
+					if (moves[i].type == QUIET) {
 						// Killer moves are moves that produce a cutoff despite being quiet
 						saveKillerMove(&moves[i], board->ply);
 					}
@@ -260,6 +257,8 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 }
 
 static int qsearch(Board *board, int alpha, int beta) {
+	++stats.nodes;
+
 	const int standPat = eval(board);
 
 	if (standPat >= beta)
@@ -271,7 +270,6 @@ static int qsearch(Board *board, int alpha, int beta) {
 	else if (standPat > alpha)
 		alpha = standPat;
 
-
 	Move moves[MAX_MOVES];
 	const int nMoves = legalMoves(board, moves);
 
@@ -281,7 +279,7 @@ static int qsearch(Board *board, int alpha, int beta) {
 	sort(board, moves, nMoves);
 
 	for (int i = 0; i < nMoves; ++i) {
-		// Prunes quiet moves (excluding promotions) and moves with negative SEE
+		// Prunes quiet moves and moves with negative SEE
 		if (moves[i].score < 60)
 			break;
 
@@ -315,7 +313,7 @@ static void timeManagement(const Board *board) {
 		}
 
 		if (remaining || increment) {
-			const clock_t timeToMove = min(remaining >> 2, ((remaining - 20) >> 5) + increment);
+			const clock_t timeToMove = min(remaining >> 2, (remaining >> 5) + increment) - 20;
 			settings.movetime = (timeToMove * CLOCKS_PER_SEC) / 1000;
 		}
 	} else {

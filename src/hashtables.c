@@ -233,7 +233,6 @@ void initializeTT(void) {
  */
 uint64_t zobristKey(const Board *board) {
 	uint64_t key = 0;
-	int castle = board->castling;
 
 	/*
 	 * Adds the keys for each piece, of each color.
@@ -256,6 +255,8 @@ uint64_t zobristKey(const Board *board) {
 	 * Adds the keys for each castling.
 	 * Indexes are KC = 768, QC = 769, kC = 770, qC = 771
 	 */
+	int castle = board->castling;
+
 	if (castle) do {
 		const int offset = CAST_OFFSET + bitScanForward(castle);
 		key ^= randomKeys[offset];
@@ -284,7 +285,7 @@ uint64_t zobristKey(const Board *board) {
  * It updates the boards key to the new one, saving steps from using the zobristKey function..
  */
 void updateBoardKey(Board *board, const Move *move, const History *history) {
-	const int color = move->color, opColor = 1 ^ color;
+	const int color = move->color, opcolor = 1 ^ color;
 
 	board->key ^= randomKeys[getOffset(color, move->piece, move->from)];
 
@@ -297,19 +298,18 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 
 	switch (move->piece) {
 	case PAWN:
-		if (move->promotion) {
+		if (move->promotion)
 			board->key ^= randomKeys[getOffset(color, move->promotion, move->to)];
-		} else {
+		else
 			board->key ^= randomKeys[getOffset(color, PAWN, move->to)];
-		}
 
 		if (board->enPassant) {
 			const int offset = ENPA_OFFSET + get_file(board->enPassant);
 			board->key ^= randomKeys[offset];
 		} else if (history->enPassant && move->to == history->enPassant) {
-			board->key ^= randomKeys[getOffset(opColor, PAWN, move->to - 8 + 16*color)];
+			board->key ^= randomKeys[getOffset(opcolor, PAWN, move->to - 8 + 16*color)];
 		} else if (history->capture != -1) {
-			board->key ^= randomKeys[getOffset(opColor, history->capture, move->to)];
+			board->key ^= randomKeys[getOffset(opcolor, history->capture, move->to)];
 		}
 
 		break;
@@ -364,15 +364,19 @@ Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
 	move.promotion = moveComp->promotion;
 
 	move.color = (board->players[WHITE] & square[move.from]) ? WHITE : BLACK;
+	move.piece = findPiece(board, square[move.from], move.color);
 
-	int piece = PAWN;
+	if (board->players[1 ^ move.color] & move.to)
+		move.type = CAPTURE;
 
-	while ((board->pieces[move.color][piece] & square[move.from]) == 0)
-		++piece;
+	move.enPassant = 0;
 
-	move.piece = piece;
-
-	if (piece == KING) {
+	switch (move.piece) {
+	case PAWN:
+		if (abs(move.to - move.from) == 16)
+			move.enPassant = move.to - 8 + 16*move.color;
+		break;
+	case KING:
 		move.castle = -1;
 
 		switch (move.from) {
@@ -397,6 +401,7 @@ Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
 			}
 			break;
 		}
+		break;
 	}
 
 	return move;
@@ -430,6 +435,7 @@ void updateCastleKey(Board *board, const int oldCast, const int newCast) {
 void defaultKeyChanges(Board *board, const Move *move, const History *history) {
 	board->key ^= randomKeys[getOffset(move->color, move->piece, move->to)];
 
-	if (history->capture != -1)
+	if (history->capture != -1) {
 		board->key ^= randomKeys[getOffset(move->color ^ 1, history->capture, move->to)];
+	}
 }

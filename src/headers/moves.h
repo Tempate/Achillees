@@ -5,6 +5,9 @@
 
 #define MAX_MOVES 218
 
+enum {NORT, NOEA, EAST, SOEA, SOUT, SOWE, WEST, NOWE};
+enum {QUIET, CAPTURE};
+
 typedef struct {
 	int from;
 	int to;
@@ -14,9 +17,10 @@ typedef struct {
 
 	int castle;
 	int promotion;
+	int enPassant;
 
 	int score;
-	int capture;
+	int type;
 } Move;
 
 typedef struct {
@@ -26,25 +30,24 @@ typedef struct {
 	int fiftyMoves;
 } History;
 
-int legalMoves(Board *board, Move *moves);
-int pseudoLegalMoves(const Board *board, Move *moves);
+extern const uint64_t kingLookup[64];
 
-long perft(Board *board, int depth);
+uint64_t perft(Board *board, int depth);
+
+int legalMoves(Board *board, Move *moves);
+
+int kingAttacked(const Board *board, const uint64_t kingBB, const int color);
+
+static inline int inCheck(const Board *board) {
+	return kingAttacked(board, board->pieces[board->turn][KING], board->turn);
+}
 
 int isLegalMove(Board *board, const Move *move);
-
-int inCheck(const Board *board);
-int kingInCheck(const Board *board, const uint64_t kingBB, const int color);
-
 int givesCheck(Board *board, const Move *move);
 int getSmallestAttacker(Board *board, const int sqr, const int color);
 
-uint64_t bishopMoves(int index, uint64_t occupied, uint64_t myPieces);
-uint64_t rookMoves  (int index, uint64_t occupied, uint64_t myPieces);
-uint64_t queenMoves (int index, uint64_t occupied, uint64_t myPieces);
-
-uint64_t kingMoves(int index);
-
-int compareMoves(const Move *moveA, const Move *moveB);
+static inline int compareMoves(const Move *moveA, const Move *moveB) {
+	return moveA->from == moveB->from && moveA->to == moveB->to && moveA->promotion == moveB->promotion;
+}
 
 #endif /* SRC_MOVES_H_ */
