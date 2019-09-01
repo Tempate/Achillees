@@ -4,6 +4,9 @@
 #include <inttypes.h>
 
 #define unsetLSB(bb) bb &= bb - 1
+#define lsbBB(bb) bb & -bb
+
+#define NO_CHECK 0xffffffffffffffff
 
 typedef struct {
 	uint64_t pieces[2][6];
@@ -25,13 +28,15 @@ typedef struct {
 
 #include "main.h"
 
+enum {NONE, VERTICAL, HORIZONTAL, DIAGRIGHT, DIAGLEFT};
+
 static const uint64_t notAFile = 0xfefefefefefefefe; // ~0x0101010101010101
 static const uint64_t notHFile = 0x7f7f7f7f7f7f7f7f; // ~0x8080808080808080
 
 static inline uint64_t get_sqr(int file, int rank) { return (uint64_t) 1ULL << (8*rank+file); }
 
-static inline int get_rank(uint64_t sqr) { return sqr / 8; }
-static inline int get_file(uint64_t sqr) { return sqr % 8; }
+static inline int get_rank(const int sqr) { return sqr / 8; }
+static inline int get_file(const int sqr) { return sqr % 8; }
 
 static inline uint64_t setBit  (uint64_t *bb, int i) { return *bb |= square[i]; }
 static inline uint64_t unsetBit(uint64_t *bb, int i) { return *bb &= ~square[i]; }
@@ -77,5 +82,7 @@ void generateFen(const Board *board, char *fen);
 void printBB(const uint64_t bb);
 int mirrorLSB(const uint64_t bb);
 
+uint64_t line(const int a, const int b);
+int typeOfPin(const int a, const int b);
 
 #endif /* BOARD_H_ */
