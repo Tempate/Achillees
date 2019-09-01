@@ -10,6 +10,10 @@ You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
 
 > The project is under active development and new features will come shortly.
 
+### Move generation
+- Plain magic bitboards
+- Legal move generation
+
 ### Evaluation
 - Material count
 - Piece-Square tables
