@@ -33,12 +33,9 @@ static inline uint64_t bCaptLeftPawn  (const uint64_t bb, const uint64_t opPiece
 
 // Lookup tables
 
-const uint64_t wPawnAttack[64] = {
-		0x200, 0x500, 0xa00, 0x1400, 0x2800, 0x5000, 0xa000, 0x4000, 0x20000, 0x50000, 0xa0000, 0x140000, 0x280000, 0x500000, 0xa00000, 0x400000, 0x2000000, 0x5000000, 0xa000000, 0x14000000, 0x28000000, 0x50000000, 0xa0000000, 0x40000000, 0x200000000, 0x500000000, 0xa00000000, 0x1400000000, 0x2800000000, 0x5000000000, 0xa000000000, 0x4000000000, 0x20000000000, 0x50000000000, 0xa0000000000, 0x140000000000, 0x280000000000, 0x500000000000, 0xa00000000000, 0x400000000000, 0x2000000000000, 0x5000000000000, 0xa000000000000, 0x14000000000000, 0x28000000000000, 0x50000000000000, 0xa0000000000000, 0x40000000000000, 0x200000000000000, 0x500000000000000, 0xa00000000000000, 0x1400000000000000, 0x2800000000000000, 0x5000000000000000, 0xa000000000000000, 0x4000000000000000, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
-};
-
-const uint64_t bPawnAttack[64] = {
-		0, 0, 0, 0, 0, 0, 0, 0, 0x2, 0x5, 0xa, 0x14, 0x28, 0x50, 0xa0, 0x40, 0x200, 0x500, 0xa00, 0x1400, 0x2800, 0x5000, 0xa000, 0x4000, 0x20000, 0x50000, 0xa0000, 0x140000, 0x280000, 0x500000, 0xa00000, 0x400000, 0x2000000, 0x5000000, 0xa000000, 0x14000000, 0x28000000, 0x50000000, 0xa0000000, 0x40000000, 0x200000000, 0x500000000, 0xa00000000, 0x1400000000, 0x2800000000, 0x5000000000, 0xa000000000, 0x4000000000, 0x20000000000, 0x50000000000, 0xa0000000000, 0x140000000000, 0x280000000000, 0x500000000000, 0xa00000000000, 0x400000000000, 0x2000000000000, 0x5000000000000, 0xa000000000000, 0x14000000000000, 0x28000000000000, 0x50000000000000, 0xa0000000000000, 0x40000000000000
+const uint64_t pawnAttacksLookup[2][64] = {
+		{0x200, 0x500, 0xa00, 0x1400, 0x2800, 0x5000, 0xa000, 0x4000, 0x20000, 0x50000, 0xa0000, 0x140000, 0x280000, 0x500000, 0xa00000, 0x400000, 0x2000000, 0x5000000, 0xa000000, 0x14000000, 0x28000000, 0x50000000, 0xa0000000, 0x40000000, 0x200000000, 0x500000000, 0xa00000000, 0x1400000000, 0x2800000000, 0x5000000000, 0xa000000000, 0x4000000000, 0x20000000000, 0x50000000000, 0xa0000000000, 0x140000000000, 0x280000000000, 0x500000000000, 0xa00000000000, 0x400000000000, 0x2000000000000, 0x5000000000000, 0xa000000000000, 0x14000000000000, 0x28000000000000, 0x50000000000000, 0xa0000000000000, 0x40000000000000, 0x200000000000000, 0x500000000000000, 0xa00000000000000, 0x1400000000000000, 0x2800000000000000, 0x5000000000000000, 0xa000000000000000, 0x4000000000000000, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0x2, 0x5, 0xa, 0x14, 0x28, 0x50, 0xa0, 0x40, 0x200, 0x500, 0xa00, 0x1400, 0x2800, 0x5000, 0xa000, 0x4000, 0x20000, 0x50000, 0xa0000, 0x140000, 0x280000, 0x500000, 0xa00000, 0x400000, 0x2000000, 0x5000000, 0xa000000, 0x14000000, 0x28000000, 0x50000000, 0xa0000000, 0x40000000, 0x200000000, 0x500000000, 0xa00000000, 0x1400000000, 0x2800000000, 0x5000000000, 0xa000000000, 0x4000000000, 0x20000000000, 0x50000000000, 0xa0000000000, 0x140000000000, 0x280000000000, 0x500000000000, 0xa00000000000, 0x400000000000, 0x2000000000000, 0x5000000000000, 0xa000000000000, 0x14000000000000, 0x28000000000000, 0x50000000000000, 0xa0000000000000, 0x40000000000000}
 };
 
 
@@ -62,7 +59,7 @@ void pawnMoves(const Board *board, Move *moves, int *n, uint64_t checkAttack, co
 	 */
 
 	if (board->enPassant)
-		opPieces |= square[board->enPassant];
+		opPieces |= bitmask[board->enPassant];
 
 	uint64_t pinnedPawns = board->pieces[board->turn][PAWN] & pinned;
 	const uint64_t bb = board->pieces[board->turn][PAWN] ^ pinnedPawns;
@@ -70,9 +67,9 @@ void pawnMoves(const Board *board, Move *moves, int *n, uint64_t checkAttack, co
 	const int kingIndex = bitScanForward(board->pieces[board->turn][KING]);
 
 	if (board->turn == WHITE) {
-		if (board->enPassant && (bPawnAttack[kingIndex] & square[board->enPassant-8])) {
+		if (board->enPassant && (pawnAttacksLookup[BLACK][kingIndex] & bitmask[board->enPassant-8])) {
 			// The pawn that just moved is giving check and it can be captured en passant
-			checkAttack |= square[board->enPassant];
+			checkAttack |= bitmask[board->enPassant];
 		}
 
 		addPawnMoves(moves, n, wCaptRightPawn(bb, opPieces) & checkAttack, WHITE, 9, CAPTURE);
@@ -83,13 +80,13 @@ void pawnMoves(const Board *board, Move *moves, int *n, uint64_t checkAttack, co
 		if (checkAttack == NO_CHECK)
 			wPinnedPawnsMoves(board, moves, n, pinnedPawns, opPieces);
 	} else {
-		if (board->enPassant && (wPawnAttack[kingIndex] & square[board->enPassant+8])) {
+		if (board->enPassant && (pawnAttacksLookup[WHITE][kingIndex] & bitmask[board->enPassant+8])) {
 			// The pawn that just moved is giving check and it can be captured en passant
-			checkAttack |= square[board->enPassant];
+			checkAttack |= bitmask[board->enPassant];
 		}
 
-		addPawnMoves(moves, n, bCaptRightPawn(bb, opPieces) & checkAttack, board->turn, -7, CAPTURE);
-		addPawnMoves(moves, n, bCaptLeftPawn (bb, opPieces) & checkAttack, board->turn, -9, CAPTURE);
+		addPawnMoves(moves, n, bCaptRightPawn(bb, opPieces) & checkAttack, BLACK, -7, CAPTURE);
+		addPawnMoves(moves, n, bCaptLeftPawn (bb, opPieces) & checkAttack, BLACK, -9, CAPTURE);
 
 		bPawnPushMoves(moves, n, bb, board->empty, checkAttack);
 
@@ -130,13 +127,13 @@ static void wPinnedPawnsMoves(const Board *board, Move *moves, int *n, uint64_t 
 
 		switch (typeOfPin(kingIndex, pawn)) {
 		case VERTICAL:
-			wPawnPushMoves(moves, n, square[pawn], board->empty, NO_CHECK);
+			wPawnPushMoves(moves, n, bitmask[pawn], board->empty, NO_CHECK);
 			break;
 		case DIAGRIGHT:
-			addPawnMoves(moves, n, wCaptRightPawn(square[pawn], opPieces), WHITE, 9, CAPTURE);
+			addPawnMoves(moves, n, wCaptRightPawn(bitmask[pawn], opPieces), WHITE, 9, CAPTURE);
 			break;
 		case DIAGLEFT:
-			addPawnMoves(moves, n, wCaptLeftPawn(square[pawn], opPieces), WHITE, 7, CAPTURE);
+			addPawnMoves(moves, n, wCaptLeftPawn(bitmask[pawn], opPieces), WHITE, 7, CAPTURE);
 			break;
 		}
 	} while (unsetLSB(pinnedPawns));
@@ -150,13 +147,13 @@ static void bPinnedPawnsMoves(const Board *board, Move *moves, int *n, uint64_t 
 
 		switch (typeOfPin(kingIndex, pawn)) {
 		case VERTICAL:
-			bPawnPushMoves(moves, n, square[pawn], board->empty, NO_CHECK);
+			bPawnPushMoves(moves, n, bitmask[pawn], board->empty, NO_CHECK);
 			break;
 		case DIAGRIGHT:
-			addPawnMoves(moves, n, bCaptLeftPawn(square[pawn], opPieces), BLACK, -9, CAPTURE);
+			addPawnMoves(moves, n, bCaptLeftPawn(bitmask[pawn], opPieces), BLACK, -9, CAPTURE);
 			break;
 		case DIAGLEFT:
-			addPawnMoves(moves, n, bCaptRightPawn(square[pawn], opPieces), BLACK, -7, CAPTURE);
+			addPawnMoves(moves, n, bCaptRightPawn(bitmask[pawn], opPieces), BLACK, -7, CAPTURE);
 			break;
 		}
 	} while (unsetLSB(pinnedPawns));

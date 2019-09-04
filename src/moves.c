@@ -5,6 +5,8 @@
 #include "headers/magic.h"
 #include "headers/pawns.h"
 
+#include "headers/hashtables.h"
+
 
 static uint64_t attackedSquares(Board *board);
 static uint64_t pinnedPieces   (const Board *board);
@@ -51,6 +53,8 @@ uint64_t perft(Board *board, int depth) {
 	for (int i = 0; i < nMoves; ++i) {
 		History history;
 
+		Board oldBoard = *board;
+
 		makeMove(board, &moves[i], &history);
 		nodes += perft(board, depth);
 		undoMove(board, &moves[i], &history);
@@ -95,11 +99,7 @@ int legalMoves(Board *board, Move *moves) {
 int kingAttacked(const Board *board, const uint64_t kingBB, const int color) {
 	const int opcolor = 1 ^ color, kingIndex = bitScanForward(kingBB);
 
-	if (color == WHITE) {
-		if (wPawnAttack[kingIndex] & board->pieces[opcolor][PAWN]) return 1;
-	} else {
-		if (bPawnAttack[kingIndex] & board->pieces[opcolor][PAWN]) return 1;
-	}
+	if (pawnAttacksLookup[color][kingIndex] & board->pieces[opcolor][PAWN]) return 1;
 
 	if (bishopAttacks(kingIndex, board->occupied) & (board->pieces[opcolor][QUEEN] | board->pieces[opcolor][BISHOP])) return 1;
 	if (rookAttacks  (kingIndex, board->occupied) & (board->pieces[opcolor][QUEEN] | board->pieces[opcolor][ROOK])) return 1;
@@ -113,19 +113,15 @@ int kingAttacked(const Board *board, const uint64_t kingBB, const int color) {
 static int numberOfChecks(const Board *board) {
 	const int kingIndex = bitScanForward(board->pieces[board->turn][KING]);
 
-	int checks = 0;
+	uint64_t checks = 0;
 
-	if (board->turn == WHITE)
-		checks += popCount(wPawnAttack[kingIndex] & board->pieces[board->opponent][PAWN]);
-	else
-		checks += popCount(bPawnAttack[kingIndex] & board->pieces[board->opponent][PAWN]);
+	checks |= pawnAttacksLookup[board->turn][kingIndex] &  board->pieces[board->opponent][PAWN];
+	checks |= bishopAttacks(kingIndex, board->occupied) & (board->pieces[board->opponent][QUEEN] | board->pieces[board->opponent][BISHOP]);
+	checks |= rookAttacks  (kingIndex, board->occupied) & (board->pieces[board->opponent][QUEEN] | board->pieces[board->opponent][ROOK]);
+	checks |= knightLookup[kingIndex] & board->pieces[board->opponent][KNIGHT];
+	checks |= kingLookup  [kingIndex] & board->pieces[board->opponent][KING];
 
-	checks += popCount(bishopAttacks(kingIndex, board->occupied) & (board->pieces[board->opponent][QUEEN] | board->pieces[board->opponent][BISHOP]));
-	checks += popCount(rookAttacks  (kingIndex, board->occupied) & (board->pieces[board->opponent][QUEEN] | board->pieces[board->opponent][ROOK]));
-	checks += popCount(knightLookup[kingIndex] & board->pieces[board->opponent][KNIGHT]);
-	checks += popCount(kingLookup  [kingIndex] & board->pieces[board->opponent][KING]);
-
-	return checks;
+	return popCount(checks);
 }
 
 static uint64_t checkingAttack(const Board *board) {
@@ -133,11 +129,7 @@ static uint64_t checkingAttack(const Board *board) {
 
 	uint64_t attacks = 0;
 
-	if (board->turn == WHITE)
-		attacks |= wPawnAttack[kingIndex] & board->pieces[board->opponent][PAWN];
-	else
-		attacks |= bPawnAttack[kingIndex] & board->pieces[board->opponent][PAWN];
-
+	attacks |= pawnAttacksLookup[board->turn][kingIndex] & board->pieces[board->opponent][PAWN];
 	attacks |= knightLookup[kingIndex] & board->pieces[board->opponent][KNIGHT];
 
 	uint64_t checkingSliders =
@@ -250,13 +242,13 @@ static void kingMoves(const Board *board, Move *moves, int *n, const uint64_t at
 
 	 if (!check) {
  		int index = 2 * board->turn;
- 		int castle = board->castling & square[index];
+ 		int castle = board->castling & bitmask[index];
 
  		if (castle && (castlingSqrs[index] & board->occupied) == 0 && (inBetweenSqr[index] & attacked) == 0)
  			moves[(*n)++] = (Move){.from=from, .to=from + 2, .piece=KING, .color=board->turn, .castle=castle};
 
  		++index;
- 		castle = board->castling & square[index];
+ 		castle = board->castling & bitmask[index];
 
  		if (castle && (castlingSqrs[index] & board->occupied) == 0 && (inBetweenSqr[index] & attacked) == 0)
  			moves[(*n)++] = (Move){.from=from, .to=from - 2, .piece=KING, .color=board->turn, .castle=castle};
@@ -325,70 +317,79 @@ int isLegalMove(Board *board, const Move *move) {
 }
 
 
-// There are errors with this function. It needs to be tested.
-int givesCheck(Board *board, const Move *move) {
-	const int opcolor = move->color ^ 1;
+int givesCheck(const Board *board, const Move *move) {
+	const int opKingIndex = bitScanForward(board->pieces[board->opponent][KING]);
 
-	const uint64_t toBB = square[move->to];
-	const uint64_t opKing = board->pieces[opcolor][KING];
-	const int opKingIndex = bitScanForward(opKing);
+	static const uint64_t castledRook[4] = {0x20, 8, 0x2000000000000000, 0x800000000000000};
 
-	int capture = -1, captureSqr = move->to, rookSqr = 0;
+	uint64_t bishsAndQueens = board->pieces[board->turn][BISHOP] | board->pieces[board->turn][QUEEN];
+	uint64_t rooksAndQueens = board->pieces[board->turn][ROOK]   | board->pieces[board->turn][QUEEN];
 
-	uint64_t attack = 0;
+	uint64_t occupied = (board->occupied | bitmask[move->to]) ^ bitmask[move->from];
 
-	// A promotion can be considered as a piece whos moving to the promoting square
-	const int piece = (move->piece == PAWN && move->promotion) ? move->promotion : move->piece;
-
-	switch (piece) {
+	switch (move->piece) {
 	case PAWN:
-		if (move->color == WHITE)
-			attack = wPawnAttack[move->to];
-		else
-			attack = bPawnAttack[move->to];
+
+		switch (move->promotion) {
+		case KNIGHT:
+
+			if (knightLookup[move->to] & board->pieces[board->opponent][KING])
+				return 1;
+
+			break;
+		case BISHOP:
+			bishsAndQueens ^= bitmask[move->to];
+			break;
+		case ROOK:
+			rooksAndQueens ^= bitmask[move->to];
+			break;
+		case QUEEN:
+			bishsAndQueens ^= bitmask[move->to];
+			rooksAndQueens ^= bitmask[move->to];
+			break;
+		default:
+
+			if (pawnAttacksLookup[move->color][move->to] & board->pieces[board->opponent][KING])
+				return 1;
+
+			if (move->to == board->enPassant)
+				occupied ^= bitmask[move->to - 8 + 16 * move->color];
+		}
 
 		break;
 	case KNIGHT:
-		attack = knightLookup[move->to];
-		capture = findPiece(board, toBB, opcolor);
+
+		if (knightLookup[move->to] & board->pieces[board->opponent][KING])
+			return 1;
+
+		break;
+	case BISHOP:
+		bishsAndQueens ^= bitmask[move->from] | bitmask[move->to];
+		break;
+	case ROOK:
+		rooksAndQueens ^= bitmask[move->from] | bitmask[move->to];
+		break;
+	case QUEEN:
+		bishsAndQueens ^= bitmask[move->from] | bitmask[move->to];
+		rooksAndQueens ^= bitmask[move->from] | bitmask[move->to];
 		break;
 	case KING:
-		// Only rook checks are considered since the king cant check
-		switch (move->castle) {
-		case KCastle:
-			rookSqr = 5;
-			break;
-		case QCastle:
-			rookSqr = 3;
-			break;
-		case kCastle:
-			rookSqr = 61;
-			break;
-		case qCastle:
-			rookSqr = 59;
-			break;
-		default:
-			return 0;
-		}
 
-		attack = rookAttacks(rookSqr, board->occupied);
+		if (move->castle != -1)
+			rooksAndQueens ^= castledRook[bitScanForward(move->castle)];
+
+		break;
 	}
 
-	if (attack & opKing)
+	// Discovered checks
+
+	if (bishsAndQueens & bishopAttacks(opKingIndex, occupied))
 		return 1;
 
-	// The only pieces that can give a discovered check are the bishop, the rook, and the queen.
-	const uint64_t bishAndQueen = board->pieces[move->color][BISHOP] | board->pieces[move->color][QUEEN];
-	const uint64_t rookAndQueen = board->pieces[move->color][ROOK]   | board->pieces[move->color][QUEEN];
+	if (rooksAndQueens & rookAttacks(opKingIndex, occupied))
+		return 1;
 
-	makeShallowMove(board, move, capture, captureSqr);
-
-	const uint64_t bishAttack = bishAndQueen && (bishAndQueen & bishopAttacks(opKingIndex, board->occupied));
-	const uint64_t rookAttack = rookAndQueen && (rookAndQueen & rookAttacks  (opKingIndex, board->occupied));
-
-	makeShallowMove(board, move, capture, captureSqr);
-
-	return bishAttack || rookAttack;
+	return 0;
 }
 
 /*
@@ -398,13 +399,8 @@ int givesCheck(Board *board, const Move *move) {
 int getSmallestAttacker(Board *board, const int sqr, const int color) {
 	uint64_t attacker;
 
-	if (color == WHITE) {
-		attacker = bPawnAttack[sqr] & board->pieces[color][PAWN];
-		if (attacker) return bitScanForward(attacker);
-	} else {
-		attacker = wPawnAttack[sqr] & board->pieces[color][PAWN];
-		if (attacker) return bitScanForward(attacker);
-	}
+	attacker = pawnAttacksLookup[1 ^ color][sqr] & board->pieces[color][PAWN];
+	if (attacker) return bitScanForward(attacker);
 
 	attacker = knightLookup[sqr] & board->pieces[color][KNIGHT];
 	if (attacker) return bitScanForward(attacker);
