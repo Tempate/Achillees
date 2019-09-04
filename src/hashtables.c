@@ -4,7 +4,7 @@
 #include "headers/hashtables.h"
 
 
-int getOffset(const int color, const int piece, const int sqr);
+static inline int getOffset(const int color, const int piece, const int sqr);
 void updateCastleKey(Board *board, const int oldCast, const int newCast);
 void defaultKeyChanges(Board *board, const Move *move, const History *history);
 
@@ -225,7 +225,7 @@ void initializeTT(void) {
 }
 
 /*
- * Generates a unique key for each board->
+ * Generates a unique key for each board.
  * Each piece of each square has a key,
  * each castling enabled has a key,
  * each enPassant file has a key,
@@ -235,7 +235,7 @@ uint64_t zobristKey(const Board *board) {
 	uint64_t key = 0;
 
 	/*
-	 * Adds the keys for each piece, of each color.
+	 * Adds the keys for each piece of each color.
 	 * offset = 64 * kind_of_piece + sqr
 	 */
 	for (int color = WHITE; color <= BLACK; ++color) {
@@ -280,52 +280,74 @@ uint64_t zobristKey(const Board *board) {
 	return key;
 }
 
-/*
- * This function takes the board after the move has been made.
- * It updates the boards key to the new one, saving steps from using the zobristKey function..
- */
 void updateBoardKey(Board *board, const Move *move, const History *history) {
-	const int color = move->color, opcolor = 1 ^ color;
 
-	board->key ^= randomKeys[getOffset(color, move->piece, move->from)];
+	static const int castleRookFrom[4] = {7, 0, 63, 56};
+	static const int castleRookTo  [4] = {5, 3, 61, 59};
 
+	// Removes the key of the piece's previous position
+	board->key ^= randomKeys[getOffset(move->color, move->piece, move->from)];
+
+	// Removes the previous en passant key
 	if (history->enPassant) {
 		const int offset = ENPA_OFFSET + get_file(history->enPassant);
 		board->key ^= randomKeys[offset];
 	}
 
-	updateCastleKey(board, history->castling, board->castling);
+	// Adds the new en passant key
+	if (board->enPassant) {
+		const int offset = ENPA_OFFSET + get_file(board->enPassant);
+		board->key ^= randomKeys[offset];
+	}
+
+	// Castling allowance has changed
+	int castlingChanged = history->castling ^ board->castling;
+
+	if (castlingChanged) do {
+		const int offset = CAST_OFFSET + bitScanForward(castlingChanged);
+		board->key ^= randomKeys[offset];
+	} while (unsetLSB(castlingChanged));
 
 	switch (move->piece) {
 	case PAWN:
-		if (move->promotion)
-			board->key ^= randomKeys[getOffset(color, move->promotion, move->to)];
-		else
-			board->key ^= randomKeys[getOffset(color, PAWN, move->to)];
 
-		if (board->enPassant) {
-			const int offset = ENPA_OFFSET + get_file(board->enPassant);
-			board->key ^= randomKeys[offset];
-		} else if (history->enPassant && move->to == history->enPassant) {
-			board->key ^= randomKeys[getOffset(opcolor, PAWN, move->to - 8 + 16*color)];
-		} else if (history->capture != -1) {
-			board->key ^= randomKeys[getOffset(opcolor, history->capture, move->to)];
+		if (history->enPassant && history->enPassant == move->to) {
+			board->key ^= randomKeys[getOffset(move->color, move->piece, move->to)];
+			board->key ^= randomKeys[getOffset(move->color ^ 1, PAWN, move->to - 8 + 16 * move->color)];
+			break;
 		}
+
+		if (move->promotion)
+			board->key ^= randomKeys[getOffset(move->color, move->promotion, move->to)];
+		else
+			board->key ^= randomKeys[getOffset(move->color, move->piece, move->to)];
+
+		if (move->type == CAPTURE)
+			board->key ^= randomKeys[getOffset(move->color ^ 1, history->capture, move->to)];
 
 		break;
 	case KING:
-		if (move->castle != -1) {
+
+		if (move->castle > 0) {
+			// Updates the key for the new position of the pieces.
+			// The from position of the king has already been changed.
+
 			const int castle = bitScanForward(move->castle);
-			board->key ^= randomKeys[getOffset(color, KING, castleLookup[castle][0])];
-			board->key ^= randomKeys[getOffset(color, ROOK, castleLookup[castle][1])];
-			board->key ^= randomKeys[getOffset(color, ROOK, castleLookup[castle][2])];
-		} else {
-			defaultKeyChanges(board, move, history);
+
+			board->key ^= randomKeys[getOffset(move->color, KING, move->to)];
+			board->key ^= randomKeys[getOffset(move->color, ROOK, castleRookFrom[castle])];
+			board->key ^= randomKeys[getOffset(move->color, ROOK, castleRookTo  [castle])];
+
+			break;
 		}
 
-		break;
+		/* no break */
 	default:
-		defaultKeyChanges(board, move, history);
+
+		board->key ^= randomKeys[getOffset(move->color, move->piece, move->to)];
+
+		if (move->type == CAPTURE)
+			board->key ^= randomKeys[getOffset(move->color ^ 1, history->capture, move->to)];
 	}
 
 	board->key ^= randomKeys[TURN_OFFSET];
@@ -363,8 +385,8 @@ Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
 	move.to = moveComp->to;
 	move.promotion = moveComp->promotion;
 
-	move.color = (board->players[WHITE] & square[move.from]) ? WHITE : BLACK;
-	move.piece = findPiece(board, square[move.from], move.color);
+	move.color = (board->players[WHITE] & bitmask[move.from]) ? WHITE : BLACK;
+	move.piece = findPiece(board, bitmask[move.from], move.color);
 
 	if (board->players[1 ^ move.color] & move.to)
 		move.type = CAPTURE;
@@ -411,7 +433,7 @@ Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
 // AUX
 
 // Returns the offset for a piece.
-int getOffset(const int color, const int piece, const int sqr) {
+static inline int getOffset(const int color, const int piece, const int sqr) {
 	static const int kindOfPiece[2][PIECES] = {{1,3,5,7,9,11},{0,2,4,6,8,10}};
 
 	return 64 * kindOfPiece[color][piece] + sqr;
@@ -426,16 +448,4 @@ void updateCastleKey(Board *board, const int oldCast, const int newCast) {
 		const int offset = CAST_OFFSET + bitScanForward(removedCastle);
 		board->key ^= randomKeys[offset];
 	} while (unsetLSB(removedCastle));
-}
-
-/*
- * Adds the moved piece to the moved position and
- * Removed the captured piece if there was one.
- */
-void defaultKeyChanges(Board *board, const Move *move, const History *history) {
-	board->key ^= randomKeys[getOffset(move->color, move->piece, move->to)];
-
-	if (history->capture != -1) {
-		board->key ^= randomKeys[getOffset(move->color ^ 1, history->capture, move->to)];
-	}
 }
