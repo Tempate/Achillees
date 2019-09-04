@@ -47,6 +47,7 @@ void testPerft(Board *board, int depth) {
 
 	for (int i = 0; i < nMoves; i++) {
 		makeMove(board, &moves[i], &history);
+		updateBoardKey(board, &moves[i], &history);
 
 		if (depth > 0) {
 			const int r = perft(board, depth);
@@ -56,6 +57,7 @@ void testPerft(Board *board, int depth) {
 			printMove(moves[i], 0);
 		}
 
+		updateBoardKey(board, &moves[i], &history);
 		undoMove(board, &moves[i], &history);
 	}
 
@@ -250,7 +252,7 @@ void testSee(void) {
 	const int color = WHITE;
 	const int sqr = 28;
 	const int from = getSmallestAttacker(board, sqr, color);
-	const int piece = findPiece(board, square[from], color);
+	const int piece = findPiece(board, bitmask[from], color);
 
 	const Move move = (Move){.to=sqr,.from=from,.piece=piece,.color=color, .promotion=0};
 

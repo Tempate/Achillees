@@ -43,7 +43,7 @@ static inline int inCheck(const Board *board) {
 }
 
 int isLegalMove(Board *board, const Move *move);
-int givesCheck(Board *board, const Move *move);
+int givesCheck(const Board *board, const Move *move);
 int getSmallestAttacker(Board *board, const int sqr, const int color);
 
 static inline int compareMoves(const Move *moveA, const Move *moveB) {

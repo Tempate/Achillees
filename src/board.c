@@ -164,7 +164,7 @@ void moveToText(Move move, char *text) {
 	static const char pieceNames[6] = {'p', 'n', 'b', 'r', 'q', 'k'};
 	static const uint64_t promotion = 0xff000000000000ff;
 
-	if (move.piece == PAWN && (square[move.to] & promotion)) {
+	if (move.piece == PAWN && (bitmask[move.to] & promotion)) {
 		snprintf(text, 6, "%s%s%c", sqToCoord(move.from), sqToCoord(move.to), pieceNames[move.promotion]);
 	} else {
 		snprintf(text, 5, "%s%s", sqToCoord(move.from), sqToCoord(move.to));
@@ -177,9 +177,9 @@ Move textToMove(const Board *board, char *text) {
 	move.from = coordToSq(text);
 	move.to = coordToSq(text + 2);
 
-	move.color = (square[move.from] & board->players[WHITE]) ? WHITE : BLACK;
+	move.color = (bitmask[move.from] & board->players[WHITE]) ? WHITE : BLACK;
 
-	if (board->players[1 ^ move.color] & square[move.to])
+	if (board->players[1 ^ move.color] & bitmask[move.to])
 		move.type = CAPTURE;
 
 	int diff, castle;
@@ -188,7 +188,7 @@ Move textToMove(const Board *board, char *text) {
 		move.piece = PAWN;
 		move.promotion = charToPiece(text[4]);
 	} else {
-		move.piece = findPiece(board, square[move.from], move.color);
+		move.piece = findPiece(board, bitmask[move.from], move.color);
 
 		switch (move.piece) {
 		case PAWN:
@@ -250,10 +250,10 @@ int parseFen(Board *board, char *fen) {
 		board->castling = 0;
 		++i;
 	} else {
-		if (fen[i] == 'K') { board->castling += square[0]; ++i; }
-		if (fen[i] == 'Q') { board->castling += square[1]; ++i; }
-		if (fen[i] == 'k') { board->castling += square[2]; ++i; }
-		if (fen[i] == 'q') { board->castling += square[3]; ++i; }
+		if (fen[i] == 'K') { board->castling += bitmask[0]; ++i; }
+		if (fen[i] == 'Q') { board->castling += bitmask[1]; ++i; }
+		if (fen[i] == 'k') { board->castling += bitmask[2]; ++i; }
+		if (fen[i] == 'q') { board->castling += bitmask[3]; ++i; }
 	}
 
 	if (fen[++i] == '-') {
@@ -342,10 +342,10 @@ void generateFen(const Board *board, char *fen) {
 	if (board->castling == -1) {
 		fen[++k] = '-';
 	} else {
-		if (board->castling & square[0]) fen[++k] = 'K';
-		if (board->castling & square[1]) fen[++k] = 'Q';
-		if (board->castling & square[2]) fen[++k] = 'k';
-		if (board->castling & square[3]) fen[++k] = 'q';
+		if (board->castling & bitmask[0]) fen[++k] = 'K';
+		if (board->castling & bitmask[1]) fen[++k] = 'Q';
+		if (board->castling & bitmask[2]) fen[++k] = 'k';
+		if (board->castling & bitmask[3]) fen[++k] = 'q';
 	}
 
 	fen[++k] = ' ';
@@ -418,20 +418,20 @@ uint64_t line(const int a, const int b) {
 	const int aFile = get_file(a), bFile = get_file(b);
 
 	if (aFile == bFile)
-		return rayLookup[NORT][a] | rayLookup[SOUT][a] | square[a];
+		return rayLookup[NORT][a] | rayLookup[SOUT][a] | bitmask[a];
 
 	const int aRank = get_rank(a), bRank = get_rank(b);
 
 	if (aRank == bRank)
-		return rayLookup[EAST][a] | rayLookup[WEST][a] | square[a];
+		return rayLookup[EAST][a] | rayLookup[WEST][a] | bitmask[a];
 
 	// Right diagonal
 	if (aRank - aFile == bRank - bFile)
-	   return rayLookup[NOEA][a] | rayLookup[SOWE][a] | square[a];
+	   return rayLookup[NOEA][a] | rayLookup[SOWE][a] | bitmask[a];
 
 	// Left diagonal
 	if (aRank + aFile == bRank + bFile)
-		return rayLookup[NOWE][a] | rayLookup[SOEA][a] | square[a];
+		return rayLookup[NOWE][a] | rayLookup[SOEA][a] | bitmask[a];
 
 	return 0;
 }
@@ -439,19 +439,19 @@ uint64_t line(const int a, const int b) {
 int typeOfPin(const int a, const int b) {
 	assert(a >= 0 && a < 64 && b >= 0 && b < 64);
 
-	const uint64_t inBetween = inBetweenLookup[a][b] | square[a] | square[b];
+	const uint64_t inBetween = inBetweenLookup[a][b] | bitmask[a] | bitmask[b];
 	const int c = min(a, b);
 
-	if ((square[c] << 1) & inBetween)
+	if ((bitmask[c] << 1) & inBetween)
 		return HORIZONTAL;
 
-	if ((square[c] << 8) & inBetween)
+	if ((bitmask[c] << 8) & inBetween)
 		return VERTICAL;
 
-	if ((square[c] << 9) & inBetween)
+	if ((bitmask[c] << 9) & inBetween)
 		return DIAGRIGHT;
 
-	if ((square[c] << 7) & inBetween)
+	if ((bitmask[c] << 7) & inBetween)
 		return DIAGLEFT;
 
 	return NONE;

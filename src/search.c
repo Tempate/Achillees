@@ -33,7 +33,7 @@ Move search(Board *board) {
 
 	const int index = board->key % HASHTABLE_MAX_SIZE;
 
-	int alpha = -INFINITY, beta = INFINITY, delta = 15;
+	int alpha = -INFINITY, beta = INFINITY, delta;
 	int score;
 
 	for (int depth = 1; depth <= settings.depth; ++depth) {
@@ -84,12 +84,7 @@ Move search(Board *board) {
 	return bestMove;
 }
 
-/*
- * A basic implementation of alpha-beta pruning
- * Checkmate in n moves is found at depth n+1
- * alpha is the value to maximize and beta the value to minimize.
- * The initial position must have >= 1 legal moves and the initial depth must be >= 1.
- */
+
 int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	if (settings.stop)
 		return 0;
@@ -130,18 +125,17 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 	History history;
 
 	const int staticEval = eval(board);
+	const int pvNode = beta - alpha > 1;
 
 	if (!nullmove && !incheck && !isEndgame(board)) {
 
 		// Razoring
-		if (depth == 1 && staticEval + pieceValues[ROOK] < alpha) {
+		if (depth == 1 && staticEval + pieceValues[ROOK] < alpha)
 			return qsearch(board, alpha, beta);
-		}
 
 		// Static null move pruning
-		if (depth <= 6 && staticEval - pieceValues[PAWN] * depth > beta) {
+		if (depth <= 6 && staticEval - pieceValues[PAWN] * depth > beta)
 			return staticEval;
-		}
 
 		// Null move pruning
 		if (depth > R) {

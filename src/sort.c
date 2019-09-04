@@ -61,8 +61,8 @@ int see(Board *board, const int sqr) {
 
 	/* Skip it if the square isn't attacked by more pieces. */
 	if (from != -1) {
-		const int attacker = findPiece(board, square[from], board->turn);
-		const int pieceCaptured = findPiece(board, square[sqr], board->opponent);
+		const int attacker = findPiece(board, bitmask[from], board->turn);
+		const int pieceCaptured = findPiece(board, bitmask[sqr], board->opponent);
 
 		assert(attacker >= 0 && pieceCaptured >= 0);
 
@@ -83,7 +83,7 @@ int see(Board *board, const int sqr) {
 int seeCapture(Board *board, const Move *move) {
 	History history;
 
-	const int pieceCaptured = findPiece(board, square[move->to], board->opponent);
+	const int pieceCaptured = findPiece(board, bitmask[move->to], board->opponent);
 
 	makeMove(board, move, &history);
 	const int value = pieceValues[pieceCaptured] - see(board, move->to);

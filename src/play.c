@@ -125,14 +125,14 @@ void undoMove(Board *board, const Move *move, const History *history) {
 
 void makeShallowMove(Board *board, const Move *move, const int capturedPiece, const int captureSqr) {
 	if (move->promotion) {
-		board->pieces[move->color][PAWN] ^= square[move->from];
-		board->pieces[move->color][move->promotion] ^= square[move->to];
+		board->pieces[move->color][PAWN] ^= bitmask[move->from];
+		board->pieces[move->color][move->promotion] ^= bitmask[move->to];
 	} else {
-		board->pieces[move->color][move->piece] ^= square[move->from] | square[move->to];
+		board->pieces[move->color][move->piece] ^= bitmask[move->from] | bitmask[move->to];
 	}
 
 	if (move->type == CAPTURE)
-		board->pieces[move->color ^ 1][capturedPiece] ^= square[captureSqr];
+		board->pieces[move->color ^ 1][capturedPiece] ^= bitmask[captureSqr];
 
 	updateOccupancy(board);
 }
@@ -162,7 +162,7 @@ void undoNullMove(Board *board, const History *history) {
 }
 
 void checkCapture(Board *board, History *history, const int index, const int color) {
-	const uint64_t toBB = square[index];
+	const uint64_t toBB = bitmask[index];
 
 	if (toBB & board->players[color]) {
 		history->capture = findPiece(board, toBB, color);

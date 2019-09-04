@@ -138,7 +138,7 @@ void *bestmove(void *args) {
 void infoString(const Board *board, PV *pv, const int score, const int depth, const long duration, const uint64_t nodes) {
 	const int relativeScore = (board->turn == WHITE) ? score : -score;
 
-	fprintf(stdout, "info score cp %d depth %d time %ld nps %d nodes %ld pv ", relativeScore, depth, duration, 1000 * nodes / (duration+1), nodes);
+	fprintf(stdout, "info score cp %d depth %d time %ld nps %ld nodes %ld pv ", relativeScore, depth, duration, 1000 * nodes / (duration+1), nodes);
 
 	for (int i = 0; i < pv->count; ++i) {
 		char moveText[6];

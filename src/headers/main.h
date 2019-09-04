@@ -15,7 +15,7 @@
 
 #define MAX_GAME_LENGTH 1024
 
-extern uint64_t square[64];
+extern uint64_t bitmask[64];
 extern uint64_t inBetweenLookup[64][64];
 
 typedef struct {
