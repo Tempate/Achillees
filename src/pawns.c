@@ -1,16 +1,19 @@
+#include "board.h"
+#include "pawns.h"
 
-#include "headers/board.h"
-#include "headers/pawns.h"
+
+static void wPawnPushMoves(Move **moves, const uint64_t bb, const uint64_t empty, const uint64_t checkAttack);
+static void bPawnPushMoves(Move **moves, const uint64_t bb, const uint64_t empty, const uint64_t checkAttack);
+
+static void wPinnedPawnsMoves(const Board *board, Move **moves, uint64_t pinnedPawns, const uint64_t opPieces);
+static void bPinnedPawnsMoves(const Board *board, Move **moves, uint64_t pinnedPawns, const uint64_t opPieces);
+
+static void addPawnMoves(Move **moves, uint64_t bb, const int color, const int shift, const int type);
+
+static int typeOfPin(const int a, const int b);
 
 
-static void wPawnPushMoves(Move *moves, int *n, const uint64_t bb, const uint64_t empty, const uint64_t checkAttack);
-static void bPawnPushMoves(Move *moves, int *n, const uint64_t bb, const uint64_t empty, const uint64_t checkAttack);
-
-static void wPinnedPawnsMoves(const Board *board, Move *moves, int *n, uint64_t pinnedPawns, const uint64_t opPieces);
-static void bPinnedPawnsMoves(const Board *board, Move *moves, int *n, uint64_t pinnedPawns, const uint64_t opPieces);
-
-static void addPawnMoves(Move *moves, int *n, uint64_t bb, const int color, const int shift, const int type);
-
+// Static inlines for pawn moves
 
 static inline uint64_t wSinglePushPawn(const uint64_t bb, const uint64_t empty) { return nortOne(bb) & empty; }
 static inline uint64_t bSinglePushPawn(const uint64_t bb, const uint64_t empty) { return soutOne(bb) & empty; }
@@ -48,7 +51,7 @@ uint64_t pawnAttacks(const Board *board, const int color) {
 }
 
 // TODO: Pinned en Passant
-void pawnMoves(const Board *board, Move *moves, int *n, uint64_t checkAttack, const uint64_t pinned) {
+void pawnMoves(const Board *board, Move **moves, uint64_t checkAttack, const uint64_t pinned) {
 	uint64_t opPieces = board->players[board->opponent];
 
 	/* Capturing en-passant is not detectable in the move itself,
@@ -72,54 +75,56 @@ void pawnMoves(const Board *board, Move *moves, int *n, uint64_t checkAttack, co
 			checkAttack |= bitmask[board->enPassant];
 		}
 
-		addPawnMoves(moves, n, wCaptRightPawn(bb, opPieces) & checkAttack, WHITE, 9, CAPTURE);
-		addPawnMoves(moves, n, wCaptLeftPawn (bb, opPieces) & checkAttack, WHITE, 7, CAPTURE);
+		addPawnMoves(moves, wCaptRightPawn(bb, opPieces) & checkAttack, WHITE, 9, CAPTURE);
+		addPawnMoves(moves, wCaptLeftPawn (bb, opPieces) & checkAttack, WHITE, 7, CAPTURE);
 
-		wPawnPushMoves(moves, n, bb, board->empty, checkAttack);
+		wPawnPushMoves(moves, bb, board->empty, checkAttack);
 
 		if (checkAttack == NO_CHECK)
-			wPinnedPawnsMoves(board, moves, n, pinnedPawns, opPieces);
+			wPinnedPawnsMoves(board, moves, pinnedPawns, opPieces);
 	} else {
 		if (board->enPassant && (pawnAttacksLookup[WHITE][kingIndex] & bitmask[board->enPassant+8])) {
 			// The pawn that just moved is giving check and it can be captured en passant
 			checkAttack |= bitmask[board->enPassant];
 		}
 
-		addPawnMoves(moves, n, bCaptRightPawn(bb, opPieces) & checkAttack, BLACK, -7, CAPTURE);
-		addPawnMoves(moves, n, bCaptLeftPawn (bb, opPieces) & checkAttack, BLACK, -9, CAPTURE);
+		addPawnMoves(moves, bCaptRightPawn(bb, opPieces) & checkAttack, BLACK, -7, CAPTURE);
+		addPawnMoves(moves, bCaptLeftPawn (bb, opPieces) & checkAttack, BLACK, -9, CAPTURE);
 
-		bPawnPushMoves(moves, n, bb, board->empty, checkAttack);
+		bPawnPushMoves(moves, bb, board->empty, checkAttack);
 
 		if (checkAttack == NO_CHECK)
-			bPinnedPawnsMoves(board, moves, n, pinnedPawns, opPieces);
+			bPinnedPawnsMoves(board, moves, pinnedPawns, opPieces);
 	}
 }
 
-static void wPawnPushMoves(Move *moves, int *n, const uint64_t bb, const uint64_t empty, const uint64_t checkAttack) {
+static void wPawnPushMoves(Move **moves, const uint64_t bb, const uint64_t empty, const uint64_t checkAttack) {
 	const uint64_t singlePush = wSinglePushPawn(bb, empty);
 	uint64_t doublePush = wDoublePushPawn(singlePush, empty) & checkAttack;
 
-	addPawnMoves(moves, n, singlePush & checkAttack, WHITE, 8, QUIET);
+	addPawnMoves(moves, singlePush & checkAttack, WHITE, 8, QUIET);
 
 	if (doublePush) do {
 		const int to = bitScanForward(doublePush);
-		moves[(*n)++] = (Move){.from=to-16, .to=to, .enPassant=to-8, .piece=PAWN, .color=WHITE, .type=QUIET};
+		**moves = (Move){.from=to-16, .to=to, .enPassant=to-8, .piece=PAWN, .color=WHITE, .type=QUIET};
+		(*moves)++;
 	} while (unsetLSB(doublePush));
 }
 
-static void bPawnPushMoves(Move *moves, int *n, const uint64_t bb, const uint64_t empty, const uint64_t checkAttack) {
+static void bPawnPushMoves(Move **moves, const uint64_t bb, const uint64_t empty, const uint64_t checkAttack) {
 	const uint64_t singlePush = bSinglePushPawn(bb, empty);
 	uint64_t doublePush = bDoublePushPawn(singlePush, empty) & checkAttack;
 
-	addPawnMoves(moves, n, singlePush & checkAttack, BLACK, -8, QUIET);
+	addPawnMoves(moves, singlePush & checkAttack, BLACK, -8, QUIET);
 
 	if (doublePush) do {
 		const int to = bitScanForward(doublePush);
-		moves[(*n)++] = (Move){.from=to+16, .to=to, .enPassant=to+8, .piece=PAWN, .color=BLACK, .type=QUIET};
+		**moves = (Move){.from=to+16, .to=to, .enPassant=to+8, .piece=PAWN, .color=BLACK, .type=QUIET};
+		(*moves)++;
 	} while (unsetLSB(doublePush));
 }
 
-static void wPinnedPawnsMoves(const Board *board, Move *moves, int *n, uint64_t pinnedPawns, const uint64_t opPieces) {
+static void wPinnedPawnsMoves(const Board *board, Move **moves, uint64_t pinnedPawns, const uint64_t opPieces) {
 	const int kingIndex = bitScanForward(board->pieces[WHITE][KING]);
 
 	if (pinnedPawns) do {
@@ -127,19 +132,19 @@ static void wPinnedPawnsMoves(const Board *board, Move *moves, int *n, uint64_t 
 
 		switch (typeOfPin(kingIndex, pawn)) {
 		case VERTICAL:
-			wPawnPushMoves(moves, n, bitmask[pawn], board->empty, NO_CHECK);
+			wPawnPushMoves(moves, bitmask[pawn], board->empty, NO_CHECK);
 			break;
 		case DIAGRIGHT:
-			addPawnMoves(moves, n, wCaptRightPawn(bitmask[pawn], opPieces), WHITE, 9, CAPTURE);
+			addPawnMoves(moves, wCaptRightPawn(bitmask[pawn], opPieces), WHITE, 9, CAPTURE);
 			break;
 		case DIAGLEFT:
-			addPawnMoves(moves, n, wCaptLeftPawn(bitmask[pawn], opPieces), WHITE, 7, CAPTURE);
+			addPawnMoves(moves, wCaptLeftPawn(bitmask[pawn], opPieces), WHITE, 7, CAPTURE);
 			break;
 		}
 	} while (unsetLSB(pinnedPawns));
 }
 
-static void bPinnedPawnsMoves(const Board *board, Move *moves, int *n, uint64_t pinnedPawns, const uint64_t opPieces) {
+static void bPinnedPawnsMoves(const Board *board, Move **moves, uint64_t pinnedPawns, const uint64_t opPieces) {
 	const int kingIndex = bitScanForward(board->pieces[BLACK][KING]);
 
 	if (pinnedPawns) do {
@@ -147,13 +152,13 @@ static void bPinnedPawnsMoves(const Board *board, Move *moves, int *n, uint64_t 
 
 		switch (typeOfPin(kingIndex, pawn)) {
 		case VERTICAL:
-			bPawnPushMoves(moves, n, bitmask[pawn], board->empty, NO_CHECK);
+			bPawnPushMoves(moves, bitmask[pawn], board->empty, NO_CHECK);
 			break;
 		case DIAGRIGHT:
-			addPawnMoves(moves, n, bCaptLeftPawn(bitmask[pawn], opPieces), BLACK, -9, CAPTURE);
+			addPawnMoves(moves, bCaptLeftPawn(bitmask[pawn], opPieces), BLACK, -9, CAPTURE);
 			break;
 		case DIAGLEFT:
-			addPawnMoves(moves, n, bCaptRightPawn(bitmask[pawn], opPieces), BLACK, -7, CAPTURE);
+			addPawnMoves(moves, bCaptRightPawn(bitmask[pawn], opPieces), BLACK, -7, CAPTURE);
 			break;
 		}
 	} while (unsetLSB(pinnedPawns));
@@ -161,7 +166,7 @@ static void bPinnedPawnsMoves(const Board *board, Move *moves, int *n, uint64_t 
 
 
 // Adds pawn moves to the array considering promotions separately.
-static void addPawnMoves(Move *moves, int *n, uint64_t bb, const int color, const int shift, const int type) {
+static void addPawnMoves(Move **moves, uint64_t bb, const int color, const int shift, const int type) {
 	static const uint64_t rank1AndRank8 = 0xff000000000000ff;
 
 	// Splits the bitboard into promoting pawns and non-promoting pawns
@@ -171,7 +176,8 @@ static void addPawnMoves(Move *moves, int *n, uint64_t bb, const int color, cons
 	// Adds the moves for all non-promoting pawns
 	if (bb) do {
 		const int to = bitScanForward(bb);
-		moves[(*n)++] = (Move){.from=to-shift, .to=to, .piece=PAWN, .color=color, .type=type};
+		**moves = (Move){.from=to-shift, .to=to, .piece=PAWN, .color=color, .type=type};
+		(*moves)++;
 	} while (unsetLSB(bb));
 
 	// Adds the moves for all promoting pawns
@@ -180,10 +186,38 @@ static void addPawnMoves(Move *moves, int *n, uint64_t bb, const int color, cons
 		const int from = to - shift;
 
 		// A different move is considered for every possible promotion
-		moves[(*n)++] = (Move){.from=from, .to=to, .piece=PAWN, .color=color, .type=type, .promotion=QUEEN};
-		moves[(*n)++] = (Move){.from=from, .to=to, .piece=PAWN, .color=color, .type=type, .promotion=KNIGHT};
-		moves[(*n)++] = (Move){.from=from, .to=to, .piece=PAWN, .color=color, .type=type, .promotion=BISHOP};
-		moves[(*n)++] = (Move){.from=from, .to=to, .piece=PAWN, .color=color, .type=type, .promotion=ROOK};
+		**moves = (Move){.from=from, .to=to, .piece=PAWN, .color=color, .type=type, .promotion=QUEEN};
+		(*moves)++;
+		
+		**moves = (Move){.from=from, .to=to, .piece=PAWN, .color=color, .type=type, .promotion=KNIGHT};
+		(*moves)++;
+		
+		**moves = (Move){.from=from, .to=to, .piece=PAWN, .color=color, .type=type, .promotion=BISHOP};
+		(*moves)++;
+		
+		**moves = (Move){.from=from, .to=to, .piece=PAWN, .color=color, .type=type, .promotion=ROOK};
+		(*moves)++;
 
 	} while (unsetLSB(promoting));
+}
+
+static int typeOfPin(const int a, const int b) {
+	assert(a >= 0 && a < 64 && b >= 0 && b < 64);
+
+	const uint64_t inBetween = inBetweenLookup[a][b] | bitmask[a] | bitmask[b];
+	const int c = min(a, b);
+
+	if ((bitmask[c] << 1) & inBetween)
+		return HORIZONTAL;
+
+	if ((bitmask[c] << 8) & inBetween)
+		return VERTICAL;
+
+	if ((bitmask[c] << 9) & inBetween)
+		return DIAGRIGHT;
+
+	if ((bitmask[c] << 7) & inBetween)
+		return DIAGLEFT;
+
+	return NONE;
 }

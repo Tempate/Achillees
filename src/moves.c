@@ -1,11 +1,10 @@
 #include <assert.h>
 
-#include "headers/board.h"
-#include "headers/play.h"
-#include "headers/magic.h"
-#include "headers/pawns.h"
-
-#include "headers/hashtables.h"
+#include "board.h"
+#include "play.h"
+#include "magic.h"
+#include "pawns.h"
+#include "hashtables.h"
 
 
 static uint64_t attackedSquares(Board *board);
@@ -15,17 +14,17 @@ static int numberOfChecks(const Board *board);
 static uint64_t checkingAttack(const Board *board);
 
 static uint64_t knightAttacks(const Board *board, const int color);
-static void knightMoves(const Board *board, Move *moves, int *n, const uint64_t checkAttacks, const uint64_t pinned);
+static void knightMoves(const Board *board, Move **moves, const uint64_t checkAttacks, const uint64_t pinned);
 
 static uint64_t kingAttacks(const Board *board, const int color);
-static void kingMoves(const Board *board, Move *moves, int *n, const uint64_t attacked, const uint64_t check);
+static void kingMoves(const Board *board, Move **moves, const uint64_t attacked, const uint64_t check);
 
 static uint64_t slidingAttacks(const Board *board, uint64_t (*movesFunc)(int, uint64_t), uint64_t bb);
-static void slidingMoves(const Board *board, Move *moves, int *n, const int piece, const int color, uint64_t (*movesFunc)(int, uint64_t), const uint64_t checkAttacks, const uint64_t pinned);
+static void slidingMoves(const Board *board, Move **moves, const int piece, const int color, uint64_t (*movesFunc)(int, uint64_t), const uint64_t checkAttacks, const uint64_t pinned);
 
 static inline uint64_t queenAttacks (const int index, const uint64_t occupied);
 
-static inline void saveMoves(Move *moves, int *n, const int piece, const uint64_t movesBB, const int from, const int color, const int type, const uint64_t toBB);
+static inline void saveMoves(Move **moves, const int piece, const uint64_t movesBB, const int from, const int color, const int type, const uint64_t toBB);
 
 
 // Lookup Tables
@@ -53,8 +52,6 @@ uint64_t perft(Board *board, int depth) {
 	for (int i = 0; i < nMoves; ++i) {
 		History history;
 
-		Board oldBoard = *board;
-
 		makeMove(board, &moves[i], &history);
 		nodes += perft(board, depth);
 		undoMove(board, &moves[i], &history);
@@ -64,14 +61,14 @@ uint64_t perft(Board *board, int depth) {
 }
 
 int legalMoves(Board *board, Move *moves) {
-	int n = 0;
+	
+	Move *ptr = moves;
 
 	const uint64_t attacked = attackedSquares(board);
 	const uint64_t pinned = pinnedPieces(board);
 
-	uint64_t checkAttack = NO_CHECK;
-
 	const uint64_t check = attacked & board->pieces[board->turn][KING];
+	uint64_t checkAttack = NO_CHECK;
 
 	if (check) {
 		assert(inCheck(board));
@@ -79,21 +76,21 @@ int legalMoves(Board *board, Move *moves) {
 		if (numberOfChecks(board) == 1) {
 			checkAttack = checkingAttack(board);
 		} else {
-			kingMoves(board, moves, &n, attacked, check);
-			return n;
+			kingMoves(board, &ptr, attacked, check);
+			return ptr - moves;
 		}
 	}
 
-	pawnMoves  (board, moves, &n, checkAttack, pinned);
-	knightMoves(board, moves, &n, checkAttack, pinned);
+	pawnMoves  (board, &ptr, checkAttack, pinned);
+	knightMoves(board, &ptr, checkAttack, pinned);
 
-	slidingMoves(board, moves, &n, BISHOP, board->turn, bishopAttacks, checkAttack, pinned);
-	slidingMoves(board, moves, &n, ROOK,   board->turn, rookAttacks,   checkAttack, pinned);
-	slidingMoves(board, moves, &n, QUEEN,  board->turn, queenAttacks,  checkAttack, pinned);
+	slidingMoves(board, &ptr, BISHOP, board->turn, bishopAttacks, checkAttack, pinned);
+	slidingMoves(board, &ptr, ROOK,   board->turn, rookAttacks,   checkAttack, pinned);
+	slidingMoves(board, &ptr, QUEEN,  board->turn, queenAttacks,  checkAttack, pinned);
 
-	kingMoves  (board, moves, &n, attacked, check);
+	kingMoves  (board, &ptr, attacked, check);
 
-	return n;
+	return ptr - moves;
 }
 
 int kingAttacked(const Board *board, const uint64_t kingBB, const int color) {
@@ -194,7 +191,7 @@ static uint64_t knightAttacks(const Board *board, const int color) {
 	return attacks;
 }
 
-static void knightMoves(const Board *board, Move *moves, int *n, const uint64_t checkAttacks, const uint64_t pinned) {
+static void knightMoves(const Board *board, Move **moves, const uint64_t checkAttacks, const uint64_t pinned) {
 	// Knights are always absolutely pinned, so their moves don't have to be considered.
 	uint64_t bb = board->pieces[board->turn][KNIGHT] & ~pinned;
 
@@ -202,8 +199,8 @@ static void knightMoves(const Board *board, Move *moves, int *n, const uint64_t 
 		const int from = bitScanForward(bb);
 		const uint64_t movesBB = knightLookup[from] & checkAttacks;
 
-		saveMoves(moves, n, KNIGHT, movesBB, from, board->turn, CAPTURE, board->players[board->opponent]);
-		saveMoves(moves, n, KNIGHT, movesBB, from, board->turn, QUIET, board->empty);
+		saveMoves(moves, KNIGHT, movesBB, from, board->turn, CAPTURE, board->players[board->opponent]);
+		saveMoves(moves, KNIGHT, movesBB, from, board->turn, QUIET, board->empty);
 	} while (unsetLSB(bb));
 }
 
@@ -222,15 +219,15 @@ static uint64_t kingAttacks(const Board *board, const int color) {
 	return attacks;
 }
 
-static void kingMoves(const Board *board, Move *moves, int *n, const uint64_t attacked, const uint64_t check) {
+static void kingMoves(const Board *board, Move **moves, const uint64_t attacked, const uint64_t check) {
 	static const uint64_t castlingSqrs[4] = {0x60, 0xe, 0x6000000000000000, 0xe00000000000000};
 	static const uint64_t inBetweenSqr[4] = {0x60, 0xc, 0x6000000000000000, 0xc00000000000000};
 
 	const int from = bitScanForward(board->pieces[board->turn][KING]);
 	const uint64_t movesBB = kingLookup[from] & ~attacked;
 
-	saveMoves(moves, n, KING, movesBB, from, board->turn, CAPTURE, board->players[board->opponent]);
-	saveMoves(moves, n, KING, movesBB, from, board->turn, QUIET, board->empty);
+	saveMoves(moves, KING, movesBB, from, board->turn, CAPTURE, board->players[board->opponent]);
+	saveMoves(moves, KING, movesBB, from, board->turn, QUIET, board->empty);
 
 
 	/* Castling. Ensures that:
@@ -244,14 +241,18 @@ static void kingMoves(const Board *board, Move *moves, int *n, const uint64_t at
  		int index = 2 * board->turn;
  		int castle = board->castling & bitmask[index];
 
- 		if (castle && (castlingSqrs[index] & board->occupied) == 0 && (inBetweenSqr[index] & attacked) == 0)
- 			moves[(*n)++] = (Move){.from=from, .to=from + 2, .piece=KING, .color=board->turn, .castle=castle};
+ 		if (castle && (castlingSqrs[index] & board->occupied) == 0 && (inBetweenSqr[index] & attacked) == 0) {
+ 			**moves = (Move){.from=from, .to=from + 2, .piece=KING, .color=board->turn, .castle=castle};
+			(*moves)++;
+		 }
 
  		++index;
  		castle = board->castling & bitmask[index];
 
- 		if (castle && (castlingSqrs[index] & board->occupied) == 0 && (inBetweenSqr[index] & attacked) == 0)
- 			moves[(*n)++] = (Move){.from=from, .to=from - 2, .piece=KING, .color=board->turn, .castle=castle};
+ 		if (castle && (castlingSqrs[index] & board->occupied) == 0 && (inBetweenSqr[index] & attacked) == 0) {
+ 			**moves = (Move){.from=from, .to=from - 2, .piece=KING, .color=board->turn, .castle=castle};
+			(*moves)++;
+		}
  	}
 }
 
@@ -271,7 +272,7 @@ static uint64_t slidingAttacks(const Board *board, uint64_t (*movesFunc)(int, ui
 	return attacks;
 }
 
-static void slidingMoves(const Board *board, Move *moves, int *n, const int piece, const int color, uint64_t (*movesFunc)(int, uint64_t), const uint64_t checkAttacks, const uint64_t pinned) {
+static void slidingMoves(const Board *board, Move **moves, const int piece, const int color, uint64_t (*movesFunc)(int, uint64_t), const uint64_t checkAttacks, const uint64_t pinned) {
 	const int kingIndex = bitScanForward(board->pieces[color][KING]);
 	const int opcolor = 1 ^ color;
 
@@ -282,8 +283,8 @@ static void slidingMoves(const Board *board, Move *moves, int *n, const int piec
 		const int from = bitScanForward(bb);
 		const uint64_t movesBB = movesFunc(from, board->occupied) & checkAttacks;
 
-		saveMoves(moves, n, piece, movesBB, from, color, CAPTURE, board->players[opcolor]);
-		saveMoves(moves, n, piece, movesBB, from, color, QUIET, board->empty);
+		saveMoves(moves, piece, movesBB, from, color, CAPTURE, board->players[opcolor]);
+		saveMoves(moves, piece, movesBB, from, color, QUIET, board->empty);
 	} while (unsetLSB(bb));
 
 	// A piece cannot move when the king is in check and it's pinned
@@ -294,13 +295,14 @@ static void slidingMoves(const Board *board, Move *moves, int *n, const int piec
 		// If the piece is pinned it can only possibly capture the pinning piece.
 		uint64_t attacker = movesBB & board->players[opcolor];
 
-		if (attacker)
-			moves[(*n)++] = (Move){.from=from, .to=bitScanForward(attacker), .piece=piece, .color=color, .type=CAPTURE};
+		if (attacker) {
+			**moves = (Move){.from=from, .to=bitScanForward(attacker), .piece=piece, .color=color, .type=CAPTURE};
+			(*moves)++;
+		}
 
-		saveMoves(moves, n, piece, movesBB, from, color, QUIET, board->empty);
+		saveMoves(moves, piece, movesBB, from, color, QUIET, board->empty);
 	} while (unsetLSB(pinnedSliders));
 }
-
 
 
 // TODO: This function needs to be improved.
@@ -431,12 +433,80 @@ int getSmallestAttacker(Board *board, const int sqr, const int color) {
 
 // AUX
 
-static inline void saveMoves(Move *moves, int *n, const int piece, const uint64_t movesBB, const int from, const int color, const int type, const uint64_t toBB) {
+static inline void saveMoves(Move **moves, const int piece, const uint64_t movesBB, const int from, const int color, const int type, const uint64_t toBB) {
 	uint64_t bb = movesBB & toBB;
 
 	if (bb) do {
 		const int to = bitScanForward(bb);
-		moves[(*n)++] = (Move){.from=from, .to=to, .piece=piece, .color=color, .type=type, .castle=-1, .promotion=0};
+		**moves = (Move){.from=from, .to=to, .piece=piece, .color=color, .type=type, .castle=-1, .promotion=0};
+		(*moves)++;
 	} while (unsetLSB(bb));
 }
 
+void moveToText(Move move, char *text) {
+	static const char* s[64] = {"a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1", "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2", "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3", "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4", "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5", "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6", "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7", "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8"};
+	static const char pieceChar[6] = {'p', 'n', 'b', 'r', 'q', 'k'};
+
+	if (move.piece == PAWN && (bitmask[move.to] & 0xff000000000000ff)) {
+		snprintf(text, 6, "%s%s%c", sqrToCoord(move.from), sqrToCoord(move.to), pieceChar[move.promotion]);
+	} else {
+		snprintf(text, 5, "%s%s", sqrToCoord(move.from), sqrToCoord(move.to));
+	}
+}
+
+Move textToMove(const Board *board, char *text) {
+	Move move = (Move){.castle=-1};
+
+	move.from = coordToSqr(text);
+	move.to = coordToSqr(text + 2);
+
+	move.color = (bitmask[move.from] & board->players[WHITE]) ? WHITE : BLACK;
+
+	if (board->players[1 ^ move.color] & bitmask[move.to])
+		move.type = CAPTURE;
+
+	int diff, castle;
+
+	if (text[4] >= 'a' && text[4] <= 'z') {
+		move.piece = PAWN;
+		move.promotion = charToPiece(text[4]);
+	} else {
+		move.piece = findPiece(board, bitmask[move.from], move.color);
+
+		switch (move.piece) {
+		case PAWN:
+			if (abs(move.to - move.from) == 16) {
+				move.enPassant = move.to - 8 + 16 * move.color;
+			}
+			break;
+		case KING:
+			diff = get_file(move.to) - get_file(move.from);
+
+			// Castle
+			if (abs(diff) == 2) {
+				castle = (diff > 0) ? KCastle : QCastle;
+				move.castle = castle << 2*move.color;
+			}
+			break;
+		}
+	}
+
+	return move;
+}
+
+void printMoves(Move *moves, const int n) {
+	for (int i = 0; i < n; ++i)
+		printMove(moves[i], 0);
+
+	fprintf(stdout, "\nTotal: %d\n", n);
+	fflush(stdout);
+}
+
+void printMove(const Move move, const int nodes) {
+	char text[6];
+
+	moveToText(move, text);
+
+	fprintf(stdout, "%s\t%d\n", text, nodes);
+	fflush(stdout);
+}
