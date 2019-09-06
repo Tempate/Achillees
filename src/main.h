@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <assert.h>
 
 #define ENGINE_NAME "Achillees"
 #define ENGINE_AUTHOR "tempate"
@@ -32,6 +33,9 @@ typedef struct {
 
 	int movestogo;
 	int movetime;
+
+	int tt_entries;
+	int tt_size;
 } Settings;
 
 extern Settings settings;

@@ -1,10 +1,11 @@
 #include <string.h>
 
-#include "headers/board.h"
-#include "headers/tests.h"
-#include "headers/eval.h"
-#include "headers/uci.h"
-#include "headers/magic.h"
+#include "board.h"
+#include "tests.h"
+#include "eval.h"
+#include "uci.h"
+#include "magic.h"
+#include "hashtables.h"
 
 #define INITIAL "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
@@ -18,6 +19,7 @@ Settings settings;
 
 int main(void) {
 
+	initTT();
 	initMagics();
 	initInBetween();
 
@@ -28,10 +30,10 @@ int main(void) {
 
 static void listen(void) {
 
-	Board *board = malloc(sizeof(Board));
-	char *msg = malloc(4096);
+	Board board = blankBoard();
+	initialBoard(&board);
 
-	initialBoard(board);
+	char msg[4096];
 
 	while (1) {
 		fprintf(stdout, "Achillees: ");
@@ -48,34 +50,35 @@ static void listen(void) {
 
 		if (strncmp(msg, "uci", 3) == 0) {
 			uci(); break;
-		} else if (strncmp(msg, "newboard", 8) == 0)
-			initialBoard(board);
-		else if (strncmp(msg, "position", 8) == 0)
-			parseFen(board, msg + 9);
+		} else if (strncmp(msg, "newboard", 8) == 0) {
+			clearTT();
+			initialBoard(&board);
+		} else if (strncmp(msg, "position", 8) == 0)
+			fenToBoard(&board, msg + 9);
 		else if (strncmp(msg, "moves", 5) == 0)
-			moves(board, msg + 6);
+			playMoves(&board, msg + 6);
 		else if (strncmp(msg, "print", 5) == 0)
-			printBoard(board);
+			printBoard(&board);
 		else if (strncmp(msg, "fen", 3) == 0) {
 			char fen[256];
-			generateFen(board, fen);
+			boardToFen(&board, fen);
 
 			fprintf(stdout, "\n%s\n\n", fen);
 		} else if (strncmp(msg, "eval", 4) == 0) {
 			fprintf(stdout, "\n");
 
-			evaluate(board);
+			evaluate(&board);
 
 			fprintf(stdout, "\n");
 		} else if (strncmp(msg, "depth", 5) == 0) {
 			fprintf(stdout, "\n");
 
 			settings.depth = atoi(msg + 6);
-			bestmove(board);
+			bestmove(&board);
 
 			fprintf(stdout, "\n");
 		} else if (strncmp(msg, "perft", 5) == 0)
-			testPerft(board, atoi(msg + 6));
+			testPerft(&board, atoi(msg + 6));
 		else if (strncmp(msg, "test perft", 10) == 0)
 			testPerftFile(atoi(msg + 11));
 		else if (strncmp(msg, "test keys", 9) == 0)
@@ -111,8 +114,6 @@ static void listen(void) {
 
 		fflush(stdout);
 	}
-
-	free(board);
 }
 
 void defaultSettings(Settings *settings) {

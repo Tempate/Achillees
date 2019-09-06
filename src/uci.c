@@ -5,13 +5,13 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#include "headers/board.h"
-#include "headers/play.h"
-#include "headers/search.h"
-#include "headers/eval.h"
-#include "headers/hashtables.h"
-#include "headers/uci.h"
-#include "headers/draw.h"
+#include "board.h"
+#include "play.h"
+#include "search.h"
+#include "eval.h"
+#include "hashtables.h"
+#include "uci.h"
+#include "draw.h"
 
 
 static void isready(void);
@@ -28,8 +28,8 @@ void uci(void) {
 	fprintf(stdout, "uciok\n");
 	fflush(stdout);
 
-	Board *board = malloc(sizeof(Board));
-	char *msg = malloc(4096);
+	Board board = blankBoard();
+	char msg[4096];
 
 	while (1) {
 		char *r;
@@ -40,14 +40,15 @@ void uci(void) {
 
 		if (strncmp(msg, "isready", 7) == 0)
 			isready();
-		else if (strncmp(msg, "ucinewgame", 10) == 0)
-			initialBoard(board);
-		else if (strncmp(msg, "position", 8) == 0)
-			position(board, msg + 9);
+		else if (strncmp(msg, "ucinewgame", 10) == 0) {
+			clearTT();
+			initialBoard(&board);
+		} else if (strncmp(msg, "position", 8) == 0)
+			position(&board, msg + 9);
 		else if (strncmp(msg, "eval", 4) == 0)
-			evaluate(board);
+			evaluate(&board);
 		else if (strncmp(msg, "go", 2) == 0)
-			go(board, &settings, msg + 2);
+			go(&board, &settings, msg + 2);
 		else if (strncmp(msg, "stop", 4) == 0) {
 			settings.stop = 1;
 
@@ -59,9 +60,6 @@ void uci(void) {
 
 	if (working)
 		stopSearchThread();
-
-	free(board);
-	free(msg);
 }
 
 // Lets the GUI know the engine is ready. Serves as a ping.
@@ -78,12 +76,15 @@ static void position(Board *board, char *s) {
 	if (strncmp(s, "startpos", 8) == 0) {
 		s += 9;
 		initialBoard(board);
+	} else if (strncmp(s, "fen", 3) == 0) {
+		s += 4;
+		s += fenToBoard(board, s) + 1;
 	} else {
-		s += parseFen(board, s) + 1;
+		s += fenToBoard(board, s) + 1;
 	}
 
 	if (strncmp(s, "moves", 5) == 0)
-		moves(board, s + 6);
+		playMoves(board, s + 6);
 }
 
 static void go(Board *board, Settings *settings, char *s) {
@@ -120,6 +121,21 @@ static void go(Board *board, Settings *settings, char *s) {
 	}
 
 	createSearchThread(board);
+}
+
+void playMoves(Board *board, char *moves) {
+	char *rest, *moveText;
+	rest = moves;
+
+	while ((moveText = strtok_r(rest, " ", &rest))) {
+		const Move move = textToMove(board, moveText);
+
+		History history;
+
+		makeMove(board, &move, &history);
+		updateBoardKey(board, &move, &history);
+		saveKeyToMemory(board->key);
+	}
 }
 
 void *bestmove(void *args) {
