@@ -1,11 +1,15 @@
-#include "headers/board.h"
-#include "headers/play.h"
-#include "headers/hashtables.h"
+#include "board.h"
+#include "play.h"
+#include "hashtables.h"
 
 #include <assert.h>
 
-void checkCapture(Board *board, History *history, const int index, const int color);
-void removeCastlingForRook(Board *board, const int index, const int color);
+
+static void setBits  (Board *board, const int color, const int piece, const int index);
+static void unsetBits(Board *board, const int color, const int piece, const int index);
+
+static void checkCapture(Board *board, History *history, const int index, const int color);
+static void removeCastlingForRook(Board *board, const int index, const int color);
 
 const int castleLookup[4][3] = {{6, 7, 5}, {2, 0, 3}, {62, 63, 61}, {58, 56, 59}};
 
@@ -123,21 +127,6 @@ void undoMove(Board *board, const Move *move, const History *history) {
 	board->opponent ^= 1;
 }
 
-void makeShallowMove(Board *board, const Move *move, const int capturedPiece, const int captureSqr) {
-	if (move->promotion) {
-		board->pieces[move->color][PAWN] ^= bitmask[move->from];
-		board->pieces[move->color][move->promotion] ^= bitmask[move->to];
-	} else {
-		board->pieces[move->color][move->piece] ^= bitmask[move->from] | bitmask[move->to];
-	}
-
-	if (move->type == CAPTURE)
-		board->pieces[move->color ^ 1][capturedPiece] ^= bitmask[captureSqr];
-
-	updateOccupancy(board);
-}
-
-
 void makeNullMove(Board *board, History *history) {
 	history->fiftyMoves = board->fiftyMoves;
 	history->enPassant  = board->enPassant;
@@ -161,7 +150,35 @@ void undoNullMove(Board *board, const History *history) {
 	updateNullMoveKey(board);
 }
 
-void checkCapture(Board *board, History *history, const int index, const int color) {
+int findPiece(const Board *board, const uint64_t sqrBB, const int color) {
+	for (int piece = PAWN; piece <= KING; ++piece) {
+		if (sqrBB & board->pieces[color][piece])
+			return piece;
+	}
+
+	return -1;
+}
+
+
+// AUX
+
+static void setBits(Board *board, const int color, const int piece, const int index) {
+	// Sets the bit on the general board for that player
+	setBit(&board->players[color], index);
+
+	// Sets the bit on the specific board for that piece
+	setBit(&board->pieces[color][piece], index);
+}
+
+static void unsetBits(Board *board, const int color, const int piece, const int index) {
+	// Unsets the bit on the general board for that player
+	unsetBit(&board->players[color], index);
+
+	// Unsets the bit on the specific board for that piece
+	unsetBit(&board->pieces[color][piece], index);
+}
+
+static void checkCapture(Board *board, History *history, const int index, const int color) {
 	const uint64_t toBB = bitmask[index];
 
 	if (toBB & board->players[color]) {
@@ -179,16 +196,7 @@ void checkCapture(Board *board, History *history, const int index, const int col
 	}
 }
 
-int findPiece(const Board *board, const uint64_t sqrBB, const int color) {
-	for (int piece = PAWN; piece <= KING; ++piece) {
-		if (sqrBB & board->pieces[color][piece])
-			return piece;
-	}
-
-	return -1;
-}
-
-void removeCastlingForRook(Board *board, const int index, const int color) {
+static void removeCastlingForRook(Board *board, const int index, const int color) {
 	static const int removeCastling[2][2] = {{14, 11}, {13, 7}};
 
 	if (index == 56*color) {

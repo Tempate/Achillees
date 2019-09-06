@@ -1,6 +1,6 @@
-#include "headers/board.h"
-#include "headers/draw.h"
-#include "headers/eval.h"
+#include "board.h"
+#include "draw.h"
+#include "eval.h"
 
 static void countPieces(const Board *board, Count *wCount, Count *bCount);
 

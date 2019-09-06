@@ -1,5 +1,5 @@
-#include "headers/board.h"
-#include "headers/draw.h"
+#include "board.h"
+#include "draw.h"
 
 
 static int threeFoldRepetition(const Board *board);

@@ -1,14 +1,13 @@
-
-#include "headers/board.h"
-#include "headers/play.h"
-#include "headers/draw.h"
-#include "headers/search.h"
-#include "headers/uci.h"
-#include "headers/sort.h"
-#include "headers/hashtables.h"
-
-#include <time.h>
 #include <string.h>
+#include <time.h>
+
+#include "board.h"
+#include "play.h"
+#include "draw.h"
+#include "search.h"
+#include "uci.h"
+#include "sort.h"
+#include "hashtables.h"
 
 
 void testMakeMove(char *fen) {
@@ -16,7 +15,7 @@ void testMakeMove(char *fen) {
 	Move moves[MAX_MOVES];
 	History history;
 
-	parseFen(board, fen);
+	fenToBoard(board, fen);
 
 	int n = legalMoves(board, moves);
 
@@ -106,7 +105,7 @@ void testPerftFile(const int depth) {
 		rest = strtok(NULL, ";");
 		uint64_t nodes = atoi(rest + 3);
 
-		parseFen(&board, fen);
+		fenToBoard(&board, fen);
 		uint64_t k = perft(&board, depth);
 
 		fprintf(stdout, "%s  %s \t %ld %ld\n", (nodes == k) ? "PASS" : "FAIL", fen, nodes, k);
@@ -128,8 +127,8 @@ void testKeys(void) {
 	History history;
 
 
-	parseFen(board1, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK2R w KQkq -");
-	parseFen(board2, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK1R1 b Qkq -");
+	fenToBoard(board1, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK2R w KQkq -");
+	fenToBoard(board2, "rnbqk2r/pppp1ppp/4pn2/2b5/2B5/4PN2/PPPP1PPP/RNBQK1R1 b Qkq -");
 
 	move = textToMove(board1, "h1g1");
 
@@ -171,7 +170,7 @@ void testSearch(Board *board, const int depth) {
 		if (isDraw(board)) {
 			score = 0;
 		} else {
-			score = -alphabeta(board, depth, -2 * MAX_SCORE, 2 * MAX_SCORE, 0);
+			score = -pvSearch(board, depth, -2 * MAX_SCORE, 2 * MAX_SCORE, 0);
 		}
 
 		freeKeyFromMemory();
@@ -185,12 +184,12 @@ void testSearch(Board *board, const int depth) {
 void testPosition(char* fen, const int depth) {
 	Board *board = malloc(sizeof(Board));
 
-	parseFen(board, fen);
+	fenToBoard(board, fen);
 	printBoard(board);
 
 	settings.depth = depth;
 
-	const int index = board->key % HASHTABLE_MAX_SIZE;
+	const int index = board->key % settings.tt_entries;
 	printMove(search(board), tt[index].score);
 
 	free(board);
@@ -246,7 +245,7 @@ void testDraw(void) {
 void testSee(void) {
 	Board *board = malloc(sizeof(Board));
 
-	parseFen(board, "k3r3/4r3/2b2n2/3q1pN1/4p2R/2n5/5NB1/K3R2Q w - -");
+	fenToBoard(board, "k3r3/4r3/2b2n2/3q1pN1/4p2R/2n5/5NB1/K3R2Q w - -");
 	printBoard(board);
 
 	const int color = WHITE;

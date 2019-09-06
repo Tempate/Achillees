@@ -1,23 +1,20 @@
-#include <assert.h>
+#include "board.h"
+#include "uci.h"
+#include "moves.h"
+#include "play.h"
+#include "draw.h"
+#include "eval.h"
+#include "sort.h"
+#include "search.h"
+#include "hashtables.h"
+
 #include <time.h>
 #include <string.h>
-
-#include "headers/board.h"
-#include "headers/uci.h"
-#include "headers/moves.h"
-#include "headers/play.h"
-#include "headers/draw.h"
-#include "headers/eval.h"
-#include "headers/sort.h"
-#include "headers/search.h"
-#include "headers/hashtables.h"
 
 
 static int qsearch(Board *board, int alpha, int beta);
 
 static void timeManagement(const Board *board);
-
-static PV generatePV(Board board);
 
 clock_t start;
 
@@ -26,12 +23,14 @@ Stats stats = (Stats){};
 Move search(Board *board) {
 	Move bestMove;
 
+	stats.nodes = 0;
+
 	initKillerMoves();
 
 	timeManagement(board);
 	start = clock();
 
-	const int index = board->key % HASHTABLE_MAX_SIZE;
+	const int index = board->key % settings.tt_entries;
 
 	int alpha = -INFINITY, beta = INFINITY, delta;
 	int score;
@@ -47,7 +46,7 @@ Move search(Board *board) {
 		}
 
 		while (1) {
-			score = alphabeta(board, depth, alpha, beta, 0);
+			score = pvSearch(board, depth, alpha, beta, 0);
 
 			if (settings.stop)
 				break;
@@ -68,7 +67,7 @@ Move search(Board *board) {
 
 		bestMove = decompressMove(board, &tt[index].move);
 
-		PV pv = generatePV(*board);
+		PV pv = probePV(*board);
 
 		const long duration = 1000 * (clock() - start) / CLOCKS_PER_SEC;
 		infoString(board, &pv, score, depth, duration, stats.nodes);
@@ -85,7 +84,7 @@ Move search(Board *board) {
 }
 
 
-int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) {
+int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	if (settings.stop)
 		return 0;
 
@@ -103,7 +102,7 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 
 	++stats.nodes;
 
-	const int index = board->key % HASHTABLE_MAX_SIZE;
+	const int index = board->key % settings.tt_entries;
 
 	// Transposition Table
 	if (tt[index].key == board->key && tt[index].depth == depth) {
@@ -140,7 +139,7 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 		// Null move pruning
 		if (depth > R) {
 			makeNullMove(board, &history);
-			const int score = -alphabeta(board, depth - 1 - R, -beta, -beta + 1, 1);
+			const int score = -pvSearch(board, depth - 1 - R, -beta, -beta + 1, 1);
 			undoNullMove(board, &history);
 
 			if (score >= beta)
@@ -190,7 +189,7 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 		if (isDraw(board)) {
 			score = 0;
 		} else if (i == 0) {
-			score = -alphabeta(board, newDepth, -beta, -alpha, nullmove);
+			score = -pvSearch(board, newDepth, -beta, -alpha, nullmove);
 		} else {
 			int reduct = 0;
 
@@ -199,10 +198,10 @@ int alphabeta(Board *board, int depth, int alpha, int beta, const int nullmove) 
 				++reduct;
 
 			// PV search
-			score = -alphabeta(board, newDepth - reduct, -alpha-1, -alpha, nullmove);
+			score = -pvSearch(board, newDepth - reduct, -alpha-1, -alpha, nullmove);
 
 			if (score > alpha && score < beta)
-				score = -alphabeta(board, newDepth, -beta, -alpha, nullmove);
+				score = -pvSearch(board, newDepth, -beta, -alpha, nullmove);
 		}
 
 		freeKeyFromMemory();
@@ -315,37 +314,3 @@ static void timeManagement(const Board *board) {
 	}
 }
 
-// Finds the PV line from the TT. Due to collisions, it sometimes can be incomplete.
-static PV generatePV(Board board) {
-	PV pv = (PV) {.count = 0};
-
-	while (1) {
-		const int index = board.key % HASHTABLE_MAX_SIZE;
-
-		// There's been a collision
-		if (board.key != tt[index].key)
-			break;
-
-		const Move move = decompressMove(&board, &tt[index].move);
-
-		if (!isLegalMove(&board, &move))
-			break;
-
-		assert(move.to != move.from);
-
-		// Avoids getting into an infinite loop
-		for (int i = 0; i < pv.count; ++i) {
-			if (compareMoves(&pv.moves[i], &move))
-				return pv;
-		}
-
-		pv.moves[pv.count] = move;
-		++pv.count;
-
-		History history;
-		makeMove(&board, &move, &history);
-		updateBoardKey(&board, &move, &history);
-	}
-
-	return pv;
-}

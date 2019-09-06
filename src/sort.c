@@ -1,12 +1,11 @@
 #include <assert.h>
 
-#include "headers/board.h"
-#include "headers/play.h"
-#include "headers/eval.h"
-#include "headers/search.h"
-#include "headers/hashtables.h"
-
-#include "headers/sort.h"
+#include "board.h"
+#include "play.h"
+#include "eval.h"
+#include "search.h"
+#include "hashtables.h"
+#include "sort.h"
 
 static void insertionSort(Move *list, const int n);
 
@@ -18,7 +17,7 @@ static Move killerMoves[MAX_GAME_LENGTH][2];
  * 3. Killer moves
  */
 void sort(Board *board, Move *moves, const int nMoves) {
-	const int index = board->key % HASHTABLE_MAX_SIZE;
+	const int index = board->key % settings.tt_entries;
 	Move pvMove = decompressMove(board, &tt[index].move);
 
 	for (int i = 0; i < nMoves; ++i) {
