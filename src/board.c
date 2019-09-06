@@ -1,32 +1,19 @@
 #include <string.h>
-#include <math.h>
 #include <assert.h>
 
-#include "headers/main.h"
-#include "headers/board.h"
-#include "headers/draw.h"
-#include "headers/play.h"
-#include "headers/magic.h"
-#include "headers/hashtables.h"
-
-
-static const char *sqToCoord(int sq);
-static int coordToSq(char *coord);
-
-static int charToPiece(char val);
-
+#include "main.h"
+#include "board.h"
+#include "hashtables.h"
 
 const char pieceChars[12] = {'P','N','B','R','Q','K','p','n','b','r','q','k'};
 
 
-// BOARD
-
 void initialBoard(Board *board) {
 	static char* initial = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-	parseFen(board, initial);
+	fenToBoard(board, initial);
 }
 
-Board blankBoard() {
+Board blankBoard(void) {
 	Board board = (Board) {
 		.empty = ~0,
 		.occupied = 0
@@ -37,72 +24,6 @@ Board blankBoard() {
 	memset(board.pieces[BLACK], 0, PIECES*sizeof(uint64_t));
 
 	return board;
-}
-
-void printBoard(const Board *board) {
-	printf("\n");
-
-	for (int y = RANKS-1; y >= 0; y--) {
-		for (int x = 0; x < FILES; x++) {
-			const uint64_t bb = get_sqr(x,y);
-
-			if (board->empty & bb) {
-				printf(". ");
-			} else {
-				const int color = (board->players[WHITE] & bb) ? WHITE : BLACK;
-
-				for (int j = 0; j < PIECES; j++) {
-					if (board->pieces[color][j] & bb) {
-						printf("%c ", pieceChars[j + 6*color]);
-						break;
-					}
-				}
-			}
-		}
-
-		printf("\n");
-	}
-
-	printf("\n");
-	printf("Turn: %s\n", (board->turn == WHITE) ? "White" : "Black");
-	printf("Castling: ");
-
-	if (board->castling) {
-		if (board->castling & KCastle) printf("K");
-		if (board->castling & QCastle) printf("Q");
-		if (board->castling & kCastle) printf("k");
-		if (board->castling & qCastle) printf("q");
-	} else {
-		printf("-");
-	}
-
-	printf("\n");
-	printf("En passant: %s\n", (board->enPassant > 0) ? sqToCoord(board->enPassant) : "-");
-	printf("Fifty Moves: %d\n", board->fiftyMoves);
-	printf("Ply: %d\n\n", board->ply);
-}
-
-void moves(Board *board, char *moves) {
-	char *rest;
-	rest = moves;
-
-	char *moveText;
-
-	while ((moveText = strtok_r(rest, " ", &rest))) {
-		const Move move = textToMove(board, moveText);
-
-		History history;
-
-		makeMove(board, &move, &history);
-		updateBoardKey(board, &move, &history);
-		saveKeyToMemory(board->key);
-
-		//printBoard(board);
-
-		//printf("%ld %ld \n", board->key, zobristKey(board));
-
-		//assert(board->key == zobristKey(board));
-	}
 }
 
 void updateBoard(Board *board) {
@@ -124,98 +45,8 @@ void updateOccupancy(Board *board) {
 	board->empty = ~board->occupied;
 }
 
-void setBits(Board *board, const int color, const int piece, const int index) {
-	// Sets the bit on the general board for that player
-	setBit(&board->players[color], index);
-
-	// Sets the bit on the specific board for that piece
-	setBit(&board->pieces[color][piece], index);
-}
-
-void unsetBits(Board *board, const int color, const int piece, const int index) {
-	// Unsets the bit on the general board for that player
-	unsetBit(&board->players[color], index);
-
-	// Unsets the bit on the specific board for that piece
-	unsetBit(&board->pieces[color][piece], index);
-}
-
-
-// MOVES
-
-void printMoves(Move *moves, const int n) {
-	for (int i = 0; i < n; ++i)
-		printMove(moves[i], 0);
-
-	printf("\nTotal: %d\n", n);
-}
-
-void printMove(const Move move, const int nodes) {
-	char *text = malloc(6);
-
-	moveToText(move, text);
-
-	printf("%s\t%d\n", text, nodes);
-
-	free(text);
-}
-
-void moveToText(Move move, char *text) {
-	static const char pieceNames[6] = {'p', 'n', 'b', 'r', 'q', 'k'};
-	static const uint64_t promotion = 0xff000000000000ff;
-
-	if (move.piece == PAWN && (bitmask[move.to] & promotion)) {
-		snprintf(text, 6, "%s%s%c", sqToCoord(move.from), sqToCoord(move.to), pieceNames[move.promotion]);
-	} else {
-		snprintf(text, 5, "%s%s", sqToCoord(move.from), sqToCoord(move.to));
-	}
-}
-
-Move textToMove(const Board *board, char *text) {
-	Move move = (Move){.castle=-1};
-
-	move.from = coordToSq(text);
-	move.to = coordToSq(text + 2);
-
-	move.color = (bitmask[move.from] & board->players[WHITE]) ? WHITE : BLACK;
-
-	if (board->players[1 ^ move.color] & bitmask[move.to])
-		move.type = CAPTURE;
-
-	int diff, castle;
-
-	if (text[4] >= 'a' && text[4] <= 'z') {
-		move.piece = PAWN;
-		move.promotion = charToPiece(text[4]);
-	} else {
-		move.piece = findPiece(board, bitmask[move.from], move.color);
-
-		switch (move.piece) {
-		case PAWN:
-			if (abs(move.to - move.from) == 16) {
-				move.enPassant = move.to - 8 + 16 * move.color;
-			}
-			break;
-		case KING:
-			diff = get_file(move.to) - get_file(move.from);
-
-			// Castle
-			if (abs(diff) == 2) {
-				castle = (diff > 0) ? KCastle : QCastle;
-				move.castle = castle << 2*move.color;
-			}
-			break;
-		}
-	}
-
-	return move;
-}
-
-
-// FEN
-
 // Returns the fens length
-int parseFen(Board *board, char *fen) {
+int fenToBoard(Board *board, char *fen) {
 	int rank = RANKS-1, file = 0, i = 0;
 
 	*board = blankBoard();
@@ -292,12 +123,11 @@ int parseFen(Board *board, char *fen) {
 	board->key = zobristKey(board);
 
 	updateBoard(board);
-	initializeTT();
 
 	return i;
 }
 
-void generateFen(const Board *board, char *fen) {
+void boardToFen(const Board *board, char *fen) {
 	int k = -1;
 
 	for (int y = RANKS-1; y >= 0; y--) {
@@ -366,21 +196,63 @@ void generateFen(const Board *board, char *fen) {
 	fen[++k] = '\0';
 }
 
+void printBoard(const Board *board) {
+	fprintf(stdout, "\n");
 
-// Bitboards
+	for (int y = RANKS-1; y >= 0; y--) {
+		for (int x = 0; x < FILES; x++) {
+			const uint64_t bb = get_sqr(x,y);
+
+			if (board->empty & bb) {
+				fprintf(stdout, ". ");
+			} else {
+				const int color = (board->players[WHITE] & bb) ? WHITE : BLACK;
+
+				for (int j = 0; j < PIECES; j++) {
+					if (board->pieces[color][j] & bb) {
+						fprintf(stdout, "%c ", pieceChars[j + 6*color]);
+						break;
+					}
+				}
+			}
+		}
+
+		fprintf(stdout, "\n");
+	}
+
+	fprintf(stdout, "\n");
+	fprintf(stdout, "Turn: %s\n", (board->turn == WHITE) ? "White" : "Black");
+	fprintf(stdout, "Castling: ");
+
+	if (board->castling) {
+		if (board->castling & KCastle) fprintf(stdout, "K");
+		if (board->castling & QCastle) fprintf(stdout, "Q");
+		if (board->castling & kCastle) fprintf(stdout, "k");
+		if (board->castling & qCastle) fprintf(stdout, "q");
+	} else {
+		fprintf(stdout, "-");
+	}
+
+	fprintf(stdout, "\n");
+	fprintf(stdout, "En passant: %s\n", (board->enPassant > 0) ? sqrToCoord(board->enPassant) : "-");
+	fprintf(stdout, "Fifty Moves: %d\n", board->fiftyMoves);
+	fprintf(stdout, "Ply: %d\n\n", board->ply);
+	fflush(stdout);
+}
 
 void printBB(const uint64_t bb) {
-	printf("----------------\n");
+	fprintf(stdout, "----------------\n");
 
 	for (int y = 7; y >= 0; y--) {
 		for (int x = 0; x < 8; x++) {
-			printf("%d ", (bb & get_sqr(x,y)) ? 1 : 0);
+			fprintf(stdout, "%d ", (bb & get_sqr(x,y)) ? 1 : 0);
 		}
 
-		printf("\n");
+		fprintf(stdout, "\n");
 	}
 
-	printf("----------------\n");
+	fprintf(stdout, "----------------\n");
+	fflush(stdout);
 }
 
 
@@ -436,43 +308,23 @@ uint64_t line(const int a, const int b) {
 	return 0;
 }
 
-int typeOfPin(const int a, const int b) {
-	assert(a >= 0 && a < 64 && b >= 0 && b < 64);
-
-	const uint64_t inBetween = inBetweenLookup[a][b] | bitmask[a] | bitmask[b];
-	const int c = min(a, b);
-
-	if ((bitmask[c] << 1) & inBetween)
-		return HORIZONTAL;
-
-	if ((bitmask[c] << 8) & inBetween)
-		return VERTICAL;
-
-	if ((bitmask[c] << 9) & inBetween)
-		return DIAGRIGHT;
-
-	if ((bitmask[c] << 7) & inBetween)
-		return DIAGLEFT;
-
-	return NONE;
-}
-
-
 
 
 // AUX
 
-static const char *sqToCoord(int sq) {
-	static const char* s[] = {"a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1", "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2", "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3", "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4", "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5", "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6", "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7", "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8"};
+const char *sqrToCoord(int sq) {
+	static const char* s[64] = {
+		"a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1", "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2", "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3", "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4", "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5", "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6", "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7", "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8"
+	};
 
 	return s[sq];
 }
 
-static int coordToSq(char *coord) {
+int coordToSqr(char *coord) {
 	return (coord[0] - 'a') + (coord[1] - '1') * 8;
 }
 
-static int charToPiece(char val) {
+int charToPiece(char val) {
 	int piece = -1;
 
 	switch (val) {

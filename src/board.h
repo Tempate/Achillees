@@ -28,8 +28,6 @@ typedef struct {
 
 #include "main.h"
 
-enum {NONE, VERTICAL, HORIZONTAL, DIAGRIGHT, DIAGLEFT};
-
 static const uint64_t notAFile = 0xfefefefefefefefe; // ~0x0101010101010101
 static const uint64_t notHFile = 0x7f7f7f7f7f7f7f7f; // ~0x8080808080808080
 
@@ -59,30 +57,27 @@ static inline int  sameParity(const int a, const int b) { return ((a ^ b) & 1) =
 
 #include "moves.h"
 
-void initialBoard(Board *board);
-Board blankBoard();
+extern const char pieceChars[12];
 
-void printBoard(const Board *board);
+void initialBoard(Board *board);
+Board blankBoard(void);
+
 void updateBoard(Board *board);
 void updateOccupancy(Board *board);
 
-void moves(Board *board, char *moves);
+int fenToBoard(Board *board, char *fen);
+void boardToFen(const Board *board, char *fen);
 
-void setBits  (Board *board, const int color, const int piece, const int index);
-void unsetBits(Board *board, const int color, const int piece, const int index);
-
-void printMoves(Move *moves, int n);
-void printMove (Move move, int nodes);
-void moveToText(Move move, char *text);
-Move textToMove(const Board *board, char *text);
-
-int parseFen(Board *board, char *fen);
-void generateFen(const Board *board, char *fen);
+void printBoard(const Board *board);
 
 void printBB(const uint64_t bb);
 int mirrorLSB(const uint64_t bb);
 
 uint64_t line(const int a, const int b);
-int typeOfPin(const int a, const int b);
+
+const char *sqrToCoord(int sq);
+int coordToSqr(char *coord);
+
+int charToPiece(char val);
 
 #endif /* BOARD_H_ */
