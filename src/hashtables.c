@@ -1,16 +1,14 @@
-#include "headers/board.h"
-#include "headers/moves.h"
-#include "headers/play.h"
-#include "headers/hashtables.h"
+#include "board.h"
+#include "moves.h"
+#include "play.h"
+#include "search.h"
+#include "hashtables.h"
 
 
 static inline int getOffset(const int color, const int piece, const int sqr);
-void updateCastleKey(Board *board, const int oldCast, const int newCast);
-void defaultKeyChanges(Board *board, const Move *move, const History *history);
 
 
-// Transposition/Refutation Table
-Entry tt[HASHTABLE_MAX_SIZE];
+Entry tt[TT_ENTRIES];
 
 /*
  * This table has been taken from: http://hardy.uhasselt.be/Toga/book_format.html
@@ -218,10 +216,17 @@ static const uint64_t randomKeys[781] = {
    0xF8D626AAAF278509,
 };
 
-void initializeTT(void) {
-	for (int i = 0; i < HASHTABLE_MAX_SIZE; ++i) {
-		tt[i] = (Entry) {.key = 0, .depth = 0};
-	}
+void initTT(void) {
+	settings.tt_size = DEF_TT_SIZE;
+	settings.tt_entries = TT_ENTRIES;
+
+	for (int i = 0; i < TT_ENTRIES; ++i)
+		tt[i] = (Entry){};
+}
+
+void clearTT(void) {
+	for (int i = 0; i < TT_ENTRIES; ++i)
+		tt[i] = (Entry){};
 }
 
 /*
@@ -280,6 +285,9 @@ uint64_t zobristKey(const Board *board) {
 	return key;
 }
 
+
+// This function assumes the move has already been played.
+// This same function is used to reverse its effect.
 void updateBoardKey(Board *board, const Move *move, const History *history) {
 
 	static const int castleRookFrom[4] = {7, 0, 63, 56};
@@ -322,7 +330,7 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 		else
 			board->key ^= randomKeys[getOffset(move->color, move->piece, move->to)];
 
-		if (move->type == CAPTURE)
+		if (history->capture != -1)
 			board->key ^= randomKeys[getOffset(move->color ^ 1, history->capture, move->to)];
 
 		break;
@@ -341,16 +349,19 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 			break;
 		}
 
+      // If it's not a castle, the king acts as a normal piece.
 		/* no break */
 	default:
 
 		board->key ^= randomKeys[getOffset(move->color, move->piece, move->to)];
 
-		if (move->type == CAPTURE)
+		if (history->capture != -1)
 			board->key ^= randomKeys[getOffset(move->color ^ 1, history->capture, move->to)];
 	}
 
 	board->key ^= randomKeys[TURN_OFFSET];
+
+	assert(zobristKey(board) == board->key);
 }
 
 void updateNullMoveKey(Board *board) {
@@ -430,22 +441,45 @@ Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
 }
 
 
-// AUX
+// Finds the PV line from the TT. Due to collisions, it sometimes can be incomplete.
+PV probePV(Board board) {
+	PV pv = (PV) {.count = 0};
+
+	while (1) {
+		const int index = board.key % settings.tt_entries;
+
+		// There's been a collision
+		if (board.key != tt[index].key)
+			break;
+
+		const Move move = decompressMove(&board, &tt[index].move);
+
+		if (!isLegalMove(&board, &move))
+			break;
+
+		assert(move.to != move.from);
+
+		// Avoids getting into an infinite loop
+		for (int i = 0; i < pv.count; ++i) {
+			if (compareMoves(&pv.moves[i], &move))
+				return pv;
+		}
+
+		pv.moves[pv.count] = move;
+		++pv.count;
+
+		History history;
+		makeMove(&board, &move, &history);
+		updateBoardKey(&board, &move, &history);
+	}
+
+	return pv;
+}
+
 
 // Returns the offset for a piece.
 static inline int getOffset(const int color, const int piece, const int sqr) {
 	static const int kindOfPiece[2][PIECES] = {{1,3,5,7,9,11},{0,2,4,6,8,10}};
 
 	return 64 * kindOfPiece[color][piece] + sqr;
-}
-
-
-// Updates the key for the changes made on allowed castles
-void updateCastleKey(Board *board, const int oldCast, const int newCast) {
-	int removedCastle = oldCast ^ newCast;
-
-	if (removedCastle) do {
-		const int offset = CAST_OFFSET + bitScanForward(removedCastle);
-		board->key ^= randomKeys[offset];
-	} while (unsetLSB(removedCastle));
 }
