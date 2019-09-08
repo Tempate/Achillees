@@ -19,6 +19,8 @@ typedef struct {
 
 	int instCutoffs;
 	int betaCutoffs;
+
+	int ttHits;
 } Stats;
 
 Move search(Board *board);
