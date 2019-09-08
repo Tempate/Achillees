@@ -74,7 +74,8 @@ Move search(Board *board) {
 	}
 
 	#ifdef DEBUG
-	fprintf(stdout, "Beta-cutoff rate: %.4f\n", (float) stats.instCutoffs / stats.betaCutoffs);
+	fprintf(stdout, "\nBeta-cutoff rate: %.4f\n", (float) stats.instCutoffs / stats.betaCutoffs);
+	fprintf(stdout, "TT hits: %d\n\n", stats.ttHits);
 	fflush(stdout);
 	#endif
 
@@ -88,7 +89,7 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	if (settings.stop)
 		return 0;
 
-	if (settings.movetime && clock() - start > settings.movetime) {
+	if (settings.movetime && depth > 2 && clock() - start > settings.movetime) {
 		settings.stop = 1;
 		return 0;
 	}
@@ -106,6 +107,11 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 
 	// Transposition Table
 	if (tt[index].key == board->key && tt[index].depth == depth) {
+		
+		#ifdef DEBUG
+		++stats.ttHits;
+		#endif
+
 		switch (tt[index].flag) {
 		case LOWER_BOUND:
 			alpha = (alpha > tt[index].score) ? alpha : tt[index].score;
