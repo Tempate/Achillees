@@ -90,3 +90,7 @@ void saveKeyToMemory(const uint64_t key) {
 void freeKeyFromMemory(void) {
 	--(memory.size);
 }
+
+void clearKeys(void) {
+	memory.size = 0;
+}

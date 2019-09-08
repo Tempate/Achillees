@@ -22,5 +22,6 @@ int isDraw(const Board *board);
 
 void saveKeyToMemory(const uint64_t key);
 void freeKeyFromMemory(void);
+void clearKeys(void);
 
 #endif /* SRC_DRAW_H_ */
