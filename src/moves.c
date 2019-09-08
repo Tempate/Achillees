@@ -161,16 +161,21 @@ static uint64_t pinnedPieces(const Board *board) {
 	uint64_t pinned = 0;
 
 	const uint64_t kingIndex = bitScanForward(board->pieces[board->turn][KING]);
+	
+	uint64_t possiblePinned = board->players[board->turn];
 
-	uint64_t pinners = (xrayBishopAttacks(kingIndex, board->occupied, board->players[board->turn]) &
+	if (board->enPassant)
+		possiblePinned |= bitmask[board->enPassant + 8 - 16 * board->opponent];
+
+	uint64_t pinners = (xrayBishopAttacks(kingIndex, board->occupied, possiblePinned) &
 			  	  	   (board->pieces[board->opponent][BISHOP] | board->pieces[board->opponent][QUEEN])) |
 
-			  	  	   (xrayRookAttacks(kingIndex, board->occupied, board->players[board->turn]) &
+			  	  	   (xrayRookAttacks(kingIndex, board->occupied, possiblePinned) &
 			  	  	   (board->pieces[board->opponent][ROOK] | board->pieces[board->opponent][QUEEN]));
 
 	if (pinners) do {
 		const int sqr = bitScanForward(pinners);
-		pinned |= inBetweenLookup[sqr][kingIndex] & board->players[board->turn];
+		pinned |= inBetweenLookup[sqr][kingIndex] & possiblePinned;
 	} while (unsetLSB(pinners));
 
 	return pinned;

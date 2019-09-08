@@ -54,27 +54,26 @@ uint64_t pawnAttacks(const Board *board, const int color) {
 void pawnMoves(const Board *board, Move **moves, uint64_t checkAttack, const uint64_t pinned) {
 	uint64_t opPieces = board->players[board->opponent];
 
-	/* Capturing en-passant is not detectable in the move itself,
-	 * so it has to be calculated on the fly.
-	 *
-	 * The condition is necessary as board->enPassant defaults to 0,
-	 * which is not a valid en-passant move.
-	 */
-
-	if (board->enPassant)
-		opPieces |= bitmask[board->enPassant];
-
 	uint64_t pinnedPawns = board->pieces[board->turn][PAWN] & pinned;
 	const uint64_t bb = board->pieces[board->turn][PAWN] ^ pinnedPawns;
 
 	const int kingIndex = bitScanForward(board->pieces[board->turn][KING]);
 
-	if (board->turn == WHITE) {
-		if (board->enPassant && (pawnAttacksLookup[BLACK][kingIndex] & bitmask[board->enPassant-8])) {
-			// The pawn that just moved is giving check and it can be captured en passant
-			checkAttack |= bitmask[board->enPassant];
-		}
+	if (board->enPassant) {
+		const uint64_t enPassantPawn = bitmask[board->enPassant - 8 + 16 * board->turn];
 
+		// If the en-passant pawn is pinned, it cannot be captured.
+		if ((enPassantPawn & pinned) == 0) {
+			opPieces |= bitmask[board->enPassant];
+
+			// The en-passant pawn is delivering check, so capturing en-passant
+			// is a way to avoid it.
+			if (enPassantPawn & pawnAttacksLookup[board->opponent][kingIndex])
+				checkAttack |= bitmask[board->enPassant];
+		}
+	}
+
+	if (board->turn == WHITE) {
 		addPawnMoves(moves, wCaptRightPawn(bb, opPieces) & checkAttack, WHITE, 9, CAPTURE);
 		addPawnMoves(moves, wCaptLeftPawn (bb, opPieces) & checkAttack, WHITE, 7, CAPTURE);
 
@@ -83,11 +82,6 @@ void pawnMoves(const Board *board, Move **moves, uint64_t checkAttack, const uin
 		if (checkAttack == NO_CHECK)
 			wPinnedPawnsMoves(board, moves, pinnedPawns, opPieces);
 	} else {
-		if (board->enPassant && (pawnAttacksLookup[WHITE][kingIndex] & bitmask[board->enPassant+8])) {
-			// The pawn that just moved is giving check and it can be captured en passant
-			checkAttack |= bitmask[board->enPassant];
-		}
-
 		addPawnMoves(moves, bCaptRightPawn(bb, opPieces) & checkAttack, BLACK, -7, CAPTURE);
 		addPawnMoves(moves, bCaptLeftPawn (bb, opPieces) & checkAttack, BLACK, -9, CAPTURE);
 
