@@ -4,7 +4,7 @@ RELEASE_FLAGS = $(FLAGS) -O3 -DNDEBUG -flto -march=native
 DEBUG_FLAGS   = $(FLAGS) -Wall -Wextra -g -gdwarf-2 -Wall -Wextra -pedantic
 
 LINKER  = gcc
-LFLAGS  = -pthread
+LDFLAGS  = -pthread
 
 EXEC    = Achillees
 SRCDIR  = src
@@ -16,7 +16,7 @@ INCLUDES := $(wildcard $(SRCDIR)/*.h)
 OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
 $(BINDIR)/$(EXEC): $(BINDIR) $(OBJDIR) $(OBJECTS)
-	@$(LINKER) -o $@ $(OBJECTS) $(LFLAGS)
+	@$(LINKER) -o $@ $(OBJECTS) $(LDFLAGS)
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@$(CXX) $(FLAGS) -c $< -o $@
