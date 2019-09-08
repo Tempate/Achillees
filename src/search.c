@@ -33,9 +33,9 @@ Move search(Board *board) {
 	const int index = board->key % settings.tt_entries;
 
 	int alpha = -INFINITY, beta = INFINITY, delta;
-	int score;
+	int score, depth;
 
-	for (int depth = 1; depth <= settings.depth; ++depth) {
+	for (depth = 1; depth <= settings.depth; ++depth) {
 
 		// Aspiration window
 		delta = 15;
@@ -79,7 +79,9 @@ Move search(Board *board) {
 	fflush(stdout);
 	#endif
 
-	assert(bestMove.to != bestMove.from);
+	// Makes sure the bestMove has been initialized
+	ASSERT(bestMove.to != bestMove.from);
+	ASSERT(depth > 1);
 
 	return bestMove;
 }
@@ -114,10 +116,10 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 
 		switch (tt[index].flag) {
 		case LOWER_BOUND:
-			alpha = (alpha > tt[index].score) ? alpha : tt[index].score;
+			alpha = max(alpha, tt[index].score);
 			break;
 		case UPPER_BOUND:
-			beta = (beta < tt[index].score) ? beta : tt[index].score;
+			beta = min(beta, tt[index].score);
 			break;
 		case EXACT:
 			return tt[index].score;
