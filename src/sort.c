@@ -1,5 +1,3 @@
-#include <assert.h>
-
 #include "board.h"
 #include "play.h"
 #include "eval.h"
@@ -17,7 +15,6 @@ static Move killerMoves[MAX_GAME_LENGTH][2];
  * 3. Killer moves
  */
 void sort(Board *board, Move *moves, const int nMoves) {
-	
 	const int index = board->key % settings.tt_entries;
 	Move pvMove = decompressMove(board, &tt[index].move);
 
@@ -57,25 +54,26 @@ void saveKillerMove(const Move *move, const int ply) {
 int see(Board *board, const int sqr) {
 	const int from = getSmallestAttacker(board, sqr, board->turn);
 
+	// Return if the square isn't attacked by more pieces
+	if (from == -1)
+		return 0;
+
 	int value = 0;
 
-	/* Skip it if the square isn't attacked by more pieces. */
-	if (from != -1) {
-		const int attacker = findPiece(board, bitmask[from], board->turn);
-		const int pieceCaptured = findPiece(board, bitmask[sqr], board->opponent);
+	const int attacker = findPiece(board, bitmask[from], board->turn);
+	const int pieceCaptured = findPiece(board, bitmask[sqr], board->opponent);
 
-		assert(attacker >= 0 && pieceCaptured >= 0);
+	assert(attacker >= 0 && pieceCaptured >= 0);
 
-		const int promotion = (attacker == PAWN && (sqr < 8 || sqr >= 56)) ? QUEEN : 0;
-		const Move move = (Move){.to=sqr, .from=from, .piece=attacker, .color=board->turn, .type=CAPTURE, .castle=-1, .promotion=promotion};
+	const int promotion = (attacker == PAWN && (sqr < 8 || sqr >= 56)) ? QUEEN : 0;
+	const Move move = (Move){.to=sqr, .from=from, .piece=attacker, .color=board->turn, .type=CAPTURE, .castle=-1, .promotion=promotion};
 
-		History history;
+	History history;
 
-		makeMove(board, &move, &history);
-		const int score = pieceValues[pieceCaptured] - see(board, sqr);
-		value = max(score, 0);
-		undoMove(board, &move, &history);
-	}
+	makeMove(board, &move, &history);
+	const int score = pieceValues[pieceCaptured] - see(board, sqr);
+	value = max(score, 0);
+	undoMove(board, &move, &history);
 
 	return value;
 }
