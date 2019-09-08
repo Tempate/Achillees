@@ -360,8 +360,6 @@ void updateBoardKey(Board *board, const Move *move, const History *history) {
 	}
 
 	board->key ^= randomKeys[TURN_OFFSET];
-
-	assert(zobristKey(board) == board->key);
 }
 
 void updateNullMoveKey(Board *board) {
