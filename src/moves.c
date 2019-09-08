@@ -1,5 +1,3 @@
-#include <assert.h>
-
 #include "board.h"
 #include "play.h"
 #include "magic.h"
@@ -71,7 +69,7 @@ int legalMoves(Board *board, Move *moves) {
 	uint64_t checkAttack = NO_CHECK;
 
 	if (check) {
-		assert(inCheck(board));
+		ASSERT(inCheck(board));
 
 		if (numberOfChecks(board) == 1) {
 			checkAttack = checkingAttack(board);

@@ -196,7 +196,7 @@ static void addPawnMoves(Move **moves, uint64_t bb, const int color, const int s
 }
 
 static int typeOfPin(const int a, const int b) {
-	assert(a >= 0 && a < 64 && b >= 0 && b < 64);
+	ASSERT(a >= 0 && a < 64 && b >= 0 && b < 64);
 
 	const uint64_t inBetween = inBetweenLookup[a][b] | bitmask[a] | bitmask[b];
 	const int c = min(a, b);

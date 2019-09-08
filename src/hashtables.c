@@ -455,7 +455,7 @@ PV probePV(Board board) {
 		if (!isLegalMove(&board, &move))
 			break;
 
-		assert(move.to != move.from);
+		ASSERT(move.to != move.from);
 
 		// Avoids getting into an infinite loop
 		for (int i = 0; i < pv.count; ++i) {

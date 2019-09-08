@@ -1,5 +1,3 @@
-#include <assert.h>
-
 #include "board.h"
 #include "magic.h"
 

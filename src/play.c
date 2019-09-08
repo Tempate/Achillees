@@ -2,8 +2,6 @@
 #include "play.h"
 #include "hashtables.h"
 
-#include <assert.h>
-
 
 static void setBits  (Board *board, const int color, const int piece, const int index);
 static void unsetBits(Board *board, const int color, const int piece, const int index);
@@ -183,7 +181,7 @@ static void checkCapture(Board *board, History *history, const int index, const 
 
 	if (toBB & board->players[color]) {
 		history->capture = findPiece(board, toBB, color);
-		assert(history->capture != -1);
+		ASSERT(history->capture != -1);
 
 		unsetBits(board, color, history->capture, index);
 
