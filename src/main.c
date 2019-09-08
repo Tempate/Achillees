@@ -30,7 +30,7 @@ int main(void) {
 
 static void listen(void) {
 
-	Board board = blankBoard();
+	Board board;
 	initialBoard(&board);
 
 	char msg[4096];
@@ -53,9 +53,12 @@ static void listen(void) {
 		} else if (strncmp(msg, "newboard", 8) == 0) {
 			clearTT();
 			initialBoard(&board);
-		} else if (strncmp(msg, "position", 8) == 0)
-			fenToBoard(&board, msg + 9);
-		else if (strncmp(msg, "moves", 5) == 0)
+		} else if (strncmp(msg, "position", 8) == 0) {
+			if (strncmp(msg + 9, "fen", 3) == 0)
+				fenToBoard(&board, msg + 13);
+			else
+				fenToBoard(&board, msg + 9);
+		} else if (strncmp(msg, "moves", 5) == 0)
 			playMoves(&board, msg + 6);
 		else if (strncmp(msg, "print", 5) == 0)
 			printBoard(&board);

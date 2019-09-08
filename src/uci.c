@@ -28,15 +28,12 @@ void uci(void) {
 	fprintf(stdout, "uciok\n");
 	fflush(stdout);
 
-	Board board = blankBoard();
+	Board board;
+	initialBoard(&board);
+
 	char msg[4096];
 
-	while (1) {
-		char *r;
-		r = fgets(msg, 4096, stdin);
-
-		if (r == NULL)
-			break;
+	while (fgets(msg, 4096, stdin) != NULL) {
 
 		if (strncmp(msg, "isready", 7) == 0)
 			isready();

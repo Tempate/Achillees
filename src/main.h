@@ -9,6 +9,8 @@
 #define ENGINE_NAME "Achillees"
 #define ENGINE_AUTHOR "tempate"
 
+// #define DEBUG
+
 #define FILES 8
 #define RANKS 8
 #define PIECES 6
