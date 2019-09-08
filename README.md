@@ -1,6 +1,6 @@
 # Achillees
 
-This project is an attempt at making a readable and accessible chess engine. It's written in plain C and it currently uses the GCC license. The command `help` will show you the list of human-friendly commands. You can also set it to UCI mode with the command `uci`.
+This project is an attempt at making a readable and accessible chess engine. It's written in plain C and it currently uses the GPLv3+ license. The command `help` will show you the list of human-friendly commands. You can also set it to UCI mode with the command `uci`.
 
 All comments and feedback are appreciated. Feel free to join us at `##chessprogramming` on [Freenode IRC](https://webchat.freenode.net) and share your thoughts.
 
@@ -29,7 +29,7 @@ You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
 
 - Move ordering
   1. PV-bonus
-  2. Captures with SEE >= 0 and promotions
+  2. Captures with SEE >= 0
   3. Killer moves
   4. Captures with SEE < 0
 
