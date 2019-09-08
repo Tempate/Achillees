@@ -1,8 +1,8 @@
 #include <string.h>
-#include <assert.h>
 
 #include "main.h"
 #include "board.h"
+#include "draw.h"
 #include "hashtables.h"
 
 const char pieceChars[12] = {'P','N','B','R','Q','K','p','n','b','r','q','k'};
@@ -10,6 +10,10 @@ const char pieceChars[12] = {'P','N','B','R','Q','K','p','n','b','r','q','k'};
 
 void initialBoard(Board *board) {
 	static char* initial = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+	
+	clearTT();
+	clearKeys();
+	
 	fenToBoard(board, initial);
 }
 

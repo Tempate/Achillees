@@ -1,5 +1,4 @@
 #include <string.h>
-#include <assert.h>
 #include <time.h>
 
 #include <unistd.h>
@@ -37,10 +36,9 @@ void uci(void) {
 
 		if (strncmp(msg, "isready", 7) == 0)
 			isready();
-		else if (strncmp(msg, "ucinewgame", 10) == 0) {
-			clearTT();
+		else if (strncmp(msg, "ucinewgame", 10) == 0)
 			initialBoard(&board);
-		} else if (strncmp(msg, "position", 8) == 0)
+		else if (strncmp(msg, "position", 8) == 0)
 			position(&board, msg + 9);
 		else if (strncmp(msg, "eval", 4) == 0)
 			evaluate(&board);
@@ -70,6 +68,8 @@ static void isready(void) {
  * position (startpos | fen) (moves e2e4 c7c5)?
  */
 static void position(Board *board, char *s) {
+	clearKeys();
+
 	if (strncmp(s, "startpos", 8) == 0) {
 		s += 9;
 		initialBoard(board);

@@ -5,6 +5,7 @@
 #include "eval.h"
 #include "uci.h"
 #include "magic.h"
+#include "draw.h"
 #include "hashtables.h"
 
 #define INITIAL "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -50,10 +51,11 @@ static void listen(void) {
 
 		if (strncmp(msg, "uci", 3) == 0) {
 			uci(); break;
-		} else if (strncmp(msg, "newboard", 8) == 0) {
-			clearTT();
+		} else if (strncmp(msg, "newboard", 8) == 0)
 			initialBoard(&board);
-		} else if (strncmp(msg, "position", 8) == 0) {
+		else if (strncmp(msg, "position", 8) == 0) {
+			clearKeys();
+
 			if (strncmp(msg + 9, "fen", 3) == 0)
 				fenToBoard(&board, msg + 13);
 			else
