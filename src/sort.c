@@ -17,6 +17,7 @@ static Move killerMoves[MAX_GAME_LENGTH][2];
  * 3. Killer moves
  */
 void sort(Board *board, Move *moves, const int nMoves) {
+	
 	const int index = board->key % settings.tt_entries;
 	Move pvMove = decompressMove(board, &tt[index].move);
 
@@ -89,18 +90,6 @@ int seeCapture(Board *board, const Move *move) {
 	undoMove(board, move, &history);
 
 	return value;
-}
-
-void sortByEval(Board *board, Move *moves, const int nMoves) {
-	for (int i = 0; i < nMoves; ++i) {
-		History history;
-
-		makeMove(board, &moves[i], &history);
-		moves[i].score = eval(board);
-		undoMove(board, &moves[i], &history);
-	}
-
-	insertionSort(moves, nMoves);
 }
 
 /*

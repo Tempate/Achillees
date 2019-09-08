@@ -16,6 +16,4 @@ void saveKillerMove(const Move *move, const int ply);
 int see(Board *board, const int sqr);
 int seeCapture(Board *board, const Move *move);
 
-void sortByEval(Board *board, Move *moves, const int nMoves);
-
 #endif /* SRC_SORT_H_ */
