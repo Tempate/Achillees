@@ -124,9 +124,10 @@ int fenToBoard(Board *board, char *fen) {
 		--i;
 	}
 
-	board->key = zobristKey(board);
-
 	updateBoard(board);
+
+	board->key = zobristKey(board);
+	saveKeyToMemory(board->key);
 
 	return i;
 }
