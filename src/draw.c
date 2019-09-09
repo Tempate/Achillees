@@ -72,7 +72,10 @@ static int insufficientMaterial(const Board *board) {
 static int threeFoldRepetition(const Board *board) {
 	int counter = 0;
 
-	for (int i = memory.size - board->fiftyMoves - 1; i < memory.size; ++i) {
+	ASSERT(memory.size == board->ply);
+	ASSERT(memory.size - board->fiftyMoves - 1 >= 0)
+
+	for (int i = 0; i < memory.size; ++i) {
 		if (board->key == memory.keys[i]) {
 			if (++counter == 3)
 				return 1;
@@ -83,12 +86,15 @@ static int threeFoldRepetition(const Board *board) {
 }
 
 void saveKeyToMemory(const uint64_t key) {
+	ASSERT(memory.size >= 0 && memory.size < MAX_GAME_LENGTH);
+
 	memory.keys[memory.size] = key;
 	++(memory.size);
 }
 
 void freeKeyFromMemory(void) {
 	--(memory.size);
+	ASSERT(memory.size >= 0);
 }
 
 void clearKeys(void) {
