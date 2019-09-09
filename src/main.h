@@ -16,7 +16,7 @@
 
 #define MAX_GAME_LENGTH 1024
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
     #define ASSERT(condition)\
@@ -30,7 +30,7 @@
         }\
     }
 #else
-    #define ASSERT(condition) {condition}
+    #define ASSERT(condition)
 #endif
 
 extern uint64_t bitmask[64];
