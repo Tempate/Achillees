@@ -1,4 +1,5 @@
 #include "board.h"
+#include "play.h"
 #include "pawns.h"
 
 
@@ -50,27 +51,36 @@ uint64_t pawnAttacks(const Board *board, const int color) {
 		return soEaOne(board->pieces[color][PAWN]) | soWeOne(board->pieces[color][PAWN]);
 }
 
-// TODO: Pinned en Passant
-void pawnMoves(const Board *board, Move **moves, uint64_t checkAttack, const uint64_t pinned) {
-	uint64_t opPieces = board->players[board->opponent];
+void pawnMoves(Board *board, Move **moves, uint64_t checkAttack, const uint64_t pinned) {
+	const uint64_t opPieces = board->players[board->opponent];
 
 	uint64_t pinnedPawns = board->pieces[board->turn][PAWN] & pinned;
 	const uint64_t bb = board->pieces[board->turn][PAWN] ^ pinnedPawns;
 
 	const int kingIndex = bitScanForward(board->pieces[board->turn][KING]);
 
+	// As en-passant capture are tricky for the legal move gen,
+	// they're dealt with by being played and checking if they're legal.
 	if (board->enPassant) {
-		const uint64_t enPassantPawn = bitmask[board->enPassant - 8 + 16 * board->turn];
+		
+		uint64_t attackers = pawnAttacksLookup[board->opponent][board->enPassant] & board->pieces[board->turn][PAWN];
 
-		// If the en-passant pawn is pinned, it cannot be captured.
-		if ((enPassantPawn & pinned) == 0) {
-			opPieces |= bitmask[board->enPassant];
+		if (attackers) do {
 
-			// The en-passant pawn is delivering check, so capturing en-passant
-			// is a way to avoid it.
-			if (enPassantPawn & pawnAttacksLookup[board->opponent][kingIndex])
-				checkAttack |= bitmask[board->enPassant];
-		}
+			const int from = bitScanForward(attackers);
+			const Move move = (Move){.from=from, .to=board->enPassant, .piece=PAWN, .color=board->turn, .type=CAPTURE};
+
+			History history;
+
+			makeMove(board, &move, &history);
+			
+			if (!kingAttacked(board, board->pieces[board->opponent][KING], board->opponent)) {
+				**moves = move;
+				(*moves)++;
+			}
+
+			undoMove(board, &move, &history);
+		} while (unsetLSB(attackers));
 	}
 
 	if (board->turn == WHITE) {
