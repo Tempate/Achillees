@@ -20,18 +20,13 @@ You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
 
 ### Search
 - AlphaBeta Pruning
+- Move ordering
 - Transposition Table
 - Time management
 - Quiescence search
 - Check extensions
 - Late move reduction
 - Aspiration windows
-
-- Move ordering
-  1. PV-bonus
-  2. Captures with SEE >= 0
-  3. Killer moves
-  4. Captures with SEE < 0
 
 - Pruning
   - Razoring
@@ -50,12 +45,12 @@ You can get the code running by following three simple steps:
 git clone https://github.com/Tempate/Achillees
 ```
 
-2. Get into the Release directory and run the command:
+2. Type the command:
 ```
-make all
+make release
 ```
 
-3. An executable should now appear inside your Release folder, you can run it by doing: 
+3. An executable should now appear inside your bin folder, you can run it by doing: 
 ```
 ./Achillees
 ```
