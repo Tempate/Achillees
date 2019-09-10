@@ -268,7 +268,8 @@ static int qsearch(Board *board, int alpha, int beta) {
 	// Delta pruning
 	if (standPat + pieceValues[QUEEN] < alpha && !isEndgame(board))
 		return alpha;
-	else if (standPat > alpha)
+	
+	if (standPat > alpha)
 		alpha = standPat;
 
 	Move moves[MAX_MOVES];
@@ -280,8 +281,9 @@ static int qsearch(Board *board, int alpha, int beta) {
 	sort(board, moves, nMoves);
 
 	for (int i = 0; i < nMoves; ++i) {
-		// Prunes quiet moves and moves with negative SEE
-		if (moves[i].score < 60)
+		
+		// Prunes quiet moves (excluding promotions) and moves with negative SEE
+		if (moves[i].score < 40)
 			break;
 
 		History history;
