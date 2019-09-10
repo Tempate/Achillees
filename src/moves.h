@@ -36,10 +36,10 @@ uint64_t perft(Board *board, int depth);
 
 int legalMoves(Board *board, Move *moves);
 
-int kingAttacked(const Board *board, const uint64_t kingBB, const int color);
+int kingAttacked(const Board *board, const int color);
 
 static inline int inCheck(const Board *board) {
-	return kingAttacked(board, board->pieces[board->turn][KING], board->turn);
+	return kingAttacked(board, board->turn);
 }
 
 int isLegalMove(Board *board, const Move *move);

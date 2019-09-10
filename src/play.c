@@ -40,6 +40,8 @@ void makeMove(Board *board, const Move *move, History *history) {
 
 		break;
 	case KING:
+		
+		board->kingIndex[color] = move->to;
 		board->castling &= removeCastling[color];	// WHITE: 1100   BLACK: 0011
 
 		/*
@@ -102,6 +104,9 @@ void undoMove(Board *board, const Move *move, const History *history) {
 			goto CAPTURE;
 		}
 	case KING:
+		
+		board->kingIndex[color] = move->from;
+		
 		if (move->castle != -1) {
 			const int castle = bitScanForward(move->castle);
 			unsetBits(board, color, KING, castleLookup[castle][0]);
@@ -109,6 +114,7 @@ void undoMove(Board *board, const Move *move, const History *history) {
 			unsetBits(board, color, ROOK, castleLookup[castle][2]);
 			break;
 		}
+
 		/* no break */
 	default:
 		unsetBits(board, color, move->piece, move->to);

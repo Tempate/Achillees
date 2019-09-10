@@ -123,6 +123,9 @@ int fenToBoard(Board *board, char *fen) {
 
 		--i;
 	}
+		
+	board->kingIndex[WHITE] = bitScanForward(board->pieces[WHITE][KING]);
+	board->kingIndex[BLACK] = bitScanForward(board->pieces[BLACK][KING]);
 
 	updateBoard(board);
 

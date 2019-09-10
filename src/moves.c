@@ -91,8 +91,9 @@ int legalMoves(Board *board, Move *moves) {
 	return ptr - moves;
 }
 
-int kingAttacked(const Board *board, const uint64_t kingBB, const int color) {
-	const int opcolor = 1 ^ color, kingIndex = bitScanForward(kingBB);
+int kingAttacked(const Board *board, const int color) {
+	const int kingIndex = board->kingIndex[color];
+	const int opcolor = 1 ^ color;
 
 	if (pawnAttacksLookup[color][kingIndex] & board->pieces[opcolor][PAWN]) return 1;
 
@@ -106,7 +107,7 @@ int kingAttacked(const Board *board, const uint64_t kingBB, const int color) {
 }
 
 static int numberOfChecks(const Board *board) {
-	const int kingIndex = bitScanForward(board->pieces[board->turn][KING]);
+	const int kingIndex = board->kingIndex[board->turn];
 
 	uint64_t checks = 0;
 
@@ -120,7 +121,7 @@ static int numberOfChecks(const Board *board) {
 }
 
 static uint64_t checkingAttack(const Board *board) {
-	const int kingIndex = bitScanForward(board->pieces[board->turn][KING]);
+	const int kingIndex = board->kingIndex[board->turn];
 
 	uint64_t attacks = 0;
 
@@ -134,7 +135,8 @@ static uint64_t checkingAttack(const Board *board) {
 	attacks |= checkingSliders;
 
 	if (checkingSliders) do {
-		attacks |= inBetweenLookup[kingIndex][bitScanForward(checkingSliders)];
+		const uint64_t attacker = bitScanForward(checkingSliders);
+		attacks |= inBetweenLookup[kingIndex][attacker];
 	} while (unsetLSB(checkingSliders));
 
 	return attacks;
@@ -156,24 +158,21 @@ static uint64_t attackedSquares(Board *board) {
 }
 
 static uint64_t pinnedPieces(const Board *board) {
-	uint64_t pinned = 0;
 
-	const uint64_t kingIndex = bitScanForward(board->pieces[board->turn][KING]);
-	
-	uint64_t possiblePinned = board->players[board->turn];
-
-	if (board->enPassant)
-		possiblePinned |= bitmask[board->enPassant + 8 - 16 * board->opponent];
+	const int kingIndex = board->kingIndex[board->turn];
+	const uint64_t possiblePinned = board->players[board->turn];
 
 	uint64_t pinners = (xrayBishopAttacks(kingIndex, board->occupied, possiblePinned) &
 			  	  	   (board->pieces[board->opponent][BISHOP] | board->pieces[board->opponent][QUEEN])) |
 
 			  	  	   (xrayRookAttacks(kingIndex, board->occupied, possiblePinned) &
 			  	  	   (board->pieces[board->opponent][ROOK] | board->pieces[board->opponent][QUEEN]));
+	
+	uint64_t pinned = 0;
 
 	if (pinners) do {
 		const int sqr = bitScanForward(pinners);
-		pinned |= inBetweenLookup[sqr][kingIndex] & possiblePinned;
+		pinned |= inBetweenLookup[kingIndex][sqr] & possiblePinned;
 	} while (unsetLSB(pinners));
 
 	return pinned;
@@ -226,7 +225,7 @@ static void kingMoves(const Board *board, Move **moves, const uint64_t attacked,
 	static const uint64_t castlingSqrs[4] = {0x60, 0xe, 0x6000000000000000, 0xe00000000000000};
 	static const uint64_t inBetweenSqr[4] = {0x60, 0xc, 0x6000000000000000, 0xc00000000000000};
 
-	const int from = bitScanForward(board->pieces[board->turn][KING]);
+	const int from = board->kingIndex[board->turn];
 	const uint64_t movesBB = kingLookup[from] & ~attacked;
 
 	saveMoves(moves, KING, movesBB, from, board->turn, CAPTURE, board->players[board->opponent]);
@@ -276,7 +275,6 @@ static uint64_t slidingAttacks(const Board *board, uint64_t (*movesFunc)(int, ui
 }
 
 static void slidingMoves(const Board *board, Move **moves, const int piece, const int color, uint64_t (*movesFunc)(int, uint64_t), const uint64_t checkAttacks, const uint64_t pinned) {
-	const int kingIndex = bitScanForward(board->pieces[color][KING]);
 	const int opcolor = 1 ^ color;
 
 	uint64_t pinnedSliders = board->pieces[color][piece] & pinned;
@@ -293,7 +291,7 @@ static void slidingMoves(const Board *board, Move **moves, const int piece, cons
 	// A piece cannot move when the king is in check and it's pinned
 	if (checkAttacks == NO_CHECK && pinnedSliders) do {
 		const int from = bitScanForward(pinnedSliders);
-		const uint64_t movesBB = movesFunc(from, board->occupied) & line(from, kingIndex);
+		const uint64_t movesBB = movesFunc(from, board->occupied) & line(from, board->kingIndex[color]);
 
 		// If the piece is pinned it can only possibly capture the pinning piece.
 		uint64_t attacker = movesBB & board->players[opcolor];
@@ -306,7 +304,6 @@ static void slidingMoves(const Board *board, Move **moves, const int piece, cons
 		saveMoves(moves, piece, movesBB, from, color, QUIET, board->empty);
 	} while (unsetLSB(pinnedSliders));
 }
-
 
 // TODO: This function needs to be improved.
 int isLegalMove(Board *board, const Move *move) {
@@ -323,7 +320,6 @@ int isLegalMove(Board *board, const Move *move) {
 
 
 int givesCheck(const Board *board, const Move *move) {
-	const int opKingIndex = bitScanForward(board->pieces[board->opponent][KING]);
 
 	static const uint64_t castledRook[4] = {0x20, 8, 0x2000000000000000, 0x800000000000000};
 
@@ -388,10 +384,10 @@ int givesCheck(const Board *board, const Move *move) {
 
 	// Discovered checks
 
-	if (bishsAndQueens & bishopAttacks(opKingIndex, occupied))
+	if (bishsAndQueens & bishopAttacks(board->kingIndex[board->opponent], occupied))
 		return 1;
 
-	if (rooksAndQueens & rookAttacks(opKingIndex, occupied))
+	if (rooksAndQueens & rookAttacks(board->kingIndex[board->opponent], occupied))
 		return 1;
 
 	return 0;

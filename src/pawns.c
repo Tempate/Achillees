@@ -57,7 +57,7 @@ void pawnMoves(Board *board, Move **moves, uint64_t checkAttack, const uint64_t 
 	uint64_t pinnedPawns = board->pieces[board->turn][PAWN] & pinned;
 	const uint64_t bb = board->pieces[board->turn][PAWN] ^ pinnedPawns;
 
-	const int kingIndex = bitScanForward(board->pieces[board->turn][KING]);
+	const int kingIndex = board->kingIndex[board->turn];
 
 	// As en-passant capture are tricky for the legal move gen,
 	// they're dealt with by being played and checking if they're legal.
@@ -74,7 +74,7 @@ void pawnMoves(Board *board, Move **moves, uint64_t checkAttack, const uint64_t 
 
 			makeMove(board, &move, &history);
 			
-			if (!kingAttacked(board, board->pieces[board->opponent][KING], board->opponent)) {
+			if (!kingAttacked(board, board->opponent)) {
 				**moves = move;
 				(*moves)++;
 			}
@@ -129,11 +129,12 @@ static void bPawnPushMoves(Move **moves, const uint64_t bb, const uint64_t empty
 }
 
 static void wPinnedPawnsMoves(const Board *board, Move **moves, uint64_t pinnedPawns, const uint64_t opPieces) {
-	const int kingIndex = bitScanForward(board->pieces[WHITE][KING]);
+	const int kingIndex = board->kingIndex[WHITE];
 
 	if (pinnedPawns) do {
 		const int pawn = bitScanForward(pinnedPawns);
 
+		// Pawns that are pinned horizontally can't move
 		switch (typeOfPin(kingIndex, pawn)) {
 		case VERTICAL:
 			wPawnPushMoves(moves, bitmask[pawn], board->empty, NO_CHECK);
@@ -149,11 +150,12 @@ static void wPinnedPawnsMoves(const Board *board, Move **moves, uint64_t pinnedP
 }
 
 static void bPinnedPawnsMoves(const Board *board, Move **moves, uint64_t pinnedPawns, const uint64_t opPieces) {
-	const int kingIndex = bitScanForward(board->pieces[BLACK][KING]);
+	const int kingIndex = board->kingIndex[BLACK];
 
 	if (pinnedPawns) do {
 		const int pawn = bitScanForward(pinnedPawns);
 
+		// Pawns that are pinned horizontally can't move
 		switch (typeOfPin(kingIndex, pawn)) {
 		case VERTICAL:
 			bPawnPushMoves(moves, bitmask[pawn], board->empty, NO_CHECK);

@@ -12,6 +12,8 @@ typedef struct {
 	uint64_t pieces[2][6];
 	uint64_t players[2];
 
+	int kingIndex[2];
+
 	uint64_t empty;
 	uint64_t occupied;
 
