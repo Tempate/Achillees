@@ -19,13 +19,13 @@ void sort(Board *board, Move *moves, const int nMoves) {
 	Move pvMove = decompressMove(board, &tt[index].move);
 
 	for (int i = 0; i < nMoves; ++i) {
-		if (board->key == tt[index].key && compareMoves(&pvMove, &moves[i])) {
+		if (board->key == tt[index].key && compareMoves(&pvMove, &moves[i]))
 			moves[i].score = INFINITY;
-
-		} else if (moves[i].type == CAPTURE) {
+		else if (moves[i].type == CAPTURE)
 			moves[i].score = 60 + seeCapture(board, &moves[i]);
-
-		} else {
+		else if (moves[i].promotion)
+			moves[i].score = 65;
+		else {
 
 			if (compareMoves(&moves[i], &killerMoves[board->ply][0]))
 				moves[i].score = 50;
@@ -90,9 +90,7 @@ int seeCapture(Board *board, const Move *move) {
 	return value;
 }
 
-/*
- * Orders a list of moves by their score using insertion sort
- */
+// Orders a list of moves by their score using insertion sort
 static void insertionSort(Move *list, const int n) {
 	for (int i = 1; i < n; ++i) {
 		const Move move = list[i];
