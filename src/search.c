@@ -91,7 +91,7 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	if (settings.stop)
 		return 0;
 
-	if (settings.movetime && depth > 2 && clock() - start > settings.movetime) {
+	if (settings.movetime && (stats.nodes & 4095) == 0 && clock() - start > settings.movetime) {
 		settings.stop = 1;
 		return 0;
 	}
@@ -133,12 +133,13 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 
 	const int staticEval = eval(board);
 	const int pvNode = beta - alpha > 1;
+	const int endgame = isEndgame(board);
 
-	if (!nullmove && !incheck && !isEndgame(board)) {
+	// Razoring
+	if (depth == 1 && !incheck && !endgame && staticEval + pieceValues[ROOK] < alpha)
+		return qsearch(board, alpha, beta);
 
-		// Razoring
-		if (depth == 1 && staticEval + pieceValues[ROOK] < alpha)
-			return qsearch(board, alpha, beta);
+	if (!nullmove && !incheck && !endgame) {
 
 		// Static null move pruning
 		if (depth <= 6 && staticEval - pieceValues[PAWN] * depth > beta)
@@ -179,8 +180,8 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	const int origAlpha = alpha, origBeta = beta;
 	const int newDepth = depth - 1;
 
-	static const int futMargins[] = {200, 300, 500};
-	const int futPrun = depth <= 3 && !incheck && staticEval + futMargins[depth-1] <= alpha;
+	static const int futMargins[] = {0, 200, 300, 500};
+	const int futPrun = depth <= 3 && !incheck && staticEval + futMargins[depth] <= alpha;
 
 	for (int i = 0; i < nMoves; ++i) {
 
