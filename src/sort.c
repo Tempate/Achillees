@@ -5,26 +5,36 @@
 #include "hashtables.h"
 #include "sort.h"
 
+static int seePromotion(Board *board, const Move *move);
+
 static void insertionSort(Move *list, const int n);
 
 static Move killerMoves[MAX_GAME_LENGTH][2];
 
 /*
- * 1. Best move from the previous PV
- * 2. SEE for captures
- * 3. Killer moves
+ * 1. TT move
+ * 2. Good captures
+ * 3. Promotions
+ * 4. Equal captures
+ * 5. Killer moves
+ * 6. Quiet moves
+ * 7. Bad captures
  */
 void sort(Board *board, Move *moves, const int nMoves) {
+
 	const int index = board->key % settings.tt_entries;
 	Move pvMove = decompressMove(board, &tt[index].move);
 
 	for (int i = 0; i < nMoves; ++i) {
 		if (board->key == tt[index].key && compareMoves(&pvMove, &moves[i]))
 			moves[i].score = INFINITY;
+
 		else if (moves[i].type == CAPTURE)
 			moves[i].score = 60 + seeCapture(board, &moves[i]);
+		
 		else if (moves[i].promotion)
 			moves[i].score = 65;
+		
 		else {
 
 			if (compareMoves(&moves[i], &killerMoves[board->ply][0]))
@@ -63,7 +73,7 @@ int see(Board *board, const int sqr) {
 	const int attacker = findPiece(board, bitmask[from], board->turn);
 	const int pieceCaptured = findPiece(board, bitmask[sqr], board->opponent);
 
-	assert(attacker >= 0 && pieceCaptured >= 0);
+	ASSERT(attacker >= 0 && pieceCaptured >= 0);
 
 	const int promotion = (attacker == PAWN && (sqr < 8 || sqr >= 56)) ? QUEEN : 0;
 	const Move move = (Move){.to=sqr, .from=from, .piece=attacker, .color=board->turn, .type=CAPTURE, .castle=-1, .promotion=promotion};
@@ -79,6 +89,8 @@ int see(Board *board, const int sqr) {
 }
 
 int seeCapture(Board *board, const Move *move) {
+	ASSERT(move->type == CAPTURE);
+
 	History history;
 
 	const int pieceCaptured = findPiece(board, bitmask[move->to], board->opponent);

@@ -203,9 +203,11 @@ static void checkCapture(Board *board, History *history, const int index, const 
 static void removeCastlingForRook(Board *board, const int index, const int color) {
 	static const int removeCastling[2][2] = {{14, 11}, {13, 7}};
 
-	if (index == 56*color) {
+	// King-side castle
+	if (index == 56*color)
 		board->castling &= removeCastling[1][color];  // WHITE: 1101   BLACK: 0111
-	} else if (index == 56*color + 7) {
+	
+	// Queen-side castle
+	else if (index == 56*color + 7)
 		board->castling &= removeCastling[0][color];  // WHITE: 1110   BLACK: 1011
-	}
 }
