@@ -8,7 +8,7 @@
 static inline int getOffset(const int color, const int piece, const int sqr);
 
 
-Entry tt[TT_ENTRIES];
+Entry *tt;
 
 /*
  * This table has been taken from: http://hardy.uhasselt.be/Toga/book_format.html
@@ -216,17 +216,29 @@ static const uint64_t randomKeys[781] = {
    0xF8D626AAAF278509,
 };
 
-void initTT(void) {
-	settings.tt_size = DEF_TT_SIZE;
-	settings.tt_entries = TT_ENTRIES;
+void initTT(const int size) {
+   // The size is given in MB
+   settings.tt_size = size * 1024 * 1024;
+	settings.tt_entries = settings.tt_size / sizeof(Entry);
 
-	for (int i = 0; i < TT_ENTRIES; ++i)
-		tt[i] = (Entry){};
+   #ifdef DEBUG
+   fprintf(stdout, "Entry size: %d bytes\n", sizeof(Entry));
+   fprintf(stdout, "TT size: %ld bytes\n", settings.tt_size);
+   fprintf(stdout, "Number of entries: %ld\n", settings.tt_entries);
+   fflush(stdout);
+   #endif
+
+   tt = calloc(settings.tt_entries, sizeof(Entry));
+}
+
+void resizeTT(const int size) {
+   free(tt);
+   initTT(size);
 }
 
 void clearTT(void) {
-	for (int i = 0; i < TT_ENTRIES; ++i)
-		tt[i] = (Entry){};
+	for (int i = 0; i < settings.tt_entries; ++i)
+		tt[i] = (Entry){ 0 };
 }
 
 /*
@@ -439,11 +451,13 @@ Move decompressMove(const Board *board, const MoveCompressed *moveComp) {
 }
 
 
-// Finds the PV line from the TT. Due to collisions, it sometimes can be incomplete.
-PV probePV(Board board) {
-	PV pv = (PV) {.count = 0};
+// Finds the PV line from the TT. 
+// Due to collisions, it sometimes can be incomplete.
+int probePV(Board board, Move *pv) {
 
-	while (1) {
+   int n = 0;
+
+   while (1) {
 		const int index = board.key % settings.tt_entries;
 
 		// There's been a collision
@@ -458,20 +472,19 @@ PV probePV(Board board) {
 		ASSERT(move.to != move.from);
 
 		// Avoids getting into an infinite loop
-		for (int i = 0; i < pv.count; ++i) {
-			if (compareMoves(&pv.moves[i], &move))
-				return pv;
+		for (int i = 0; i < n; ++i) {
+			if (compareMoves(&pv[i], &move))
+				return n;
 		}
 
-		pv.moves[pv.count] = move;
-		++pv.count;
+      pv[n++] = move;
 
 		History history;
 		makeMove(&board, &move, &history);
 		updateBoardKey(&board, &move, &history);
 	}
 
-	return pv;
+	return n;
 }
 
 

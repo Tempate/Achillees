@@ -51,8 +51,8 @@ typedef struct {
 	int movestogo;
 	int movetime;
 
-	int tt_entries;
-	int tt_size;
+	long tt_entries;
+	long tt_size;
 } Settings;
 
 extern Settings settings;
