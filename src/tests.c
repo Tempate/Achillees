@@ -167,11 +167,10 @@ void testSearch(Board *board, const int depth) {
 
 		int score;
 
-		if (isDraw(board)) {
+		if (isDraw(board))
 			score = 0;
-		} else {
+		else
 			score = -pvSearch(board, depth, -2 * MAX_SCORE, 2 * MAX_SCORE, 0);
-		}
 
 		freeKeyFromMemory();
 		updateBoardKey(board, &moves[i], &history);
