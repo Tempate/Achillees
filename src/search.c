@@ -18,12 +18,12 @@ static void timeManagement(const Board *board);
 
 clock_t start;
 
-Stats stats = (Stats){};
+Stats stats;
 
 Move search(Board *board) {
 	Move bestMove;
 
-	stats.nodes = 0;
+	stats = (Stats){ 0 };
 
 	initKillerMoves();
 
@@ -67,14 +67,24 @@ Move search(Board *board) {
 
 		bestMove = decompressMove(board, &tt[index].move);
 
-		PV pv = probePV(*board);
+		Move pv[MAX_DEPTH];
+		const int nPV = probePV(*board, pv);
 
 		const long duration = 1000 * (clock() - start) / CLOCKS_PER_SEC;
-		infoString(board, &pv, score, depth, duration, stats.nodes);
+		
+		infoString(board, depth, score, stats.nodes, duration, pv, nPV);
+
+		// Stop looking when the fastest mate has been found
+		if (abs(score) == MAX_SCORE + depth / 2)
+			break;
 	}
 
 	#ifdef DEBUG
-	fprintf(stdout, "\nBeta-cutoff rate: %.4f\n", (float) stats.instCutoffs / stats.betaCutoffs);
+	fprintf(stdout, "\n");
+
+	if (stats.betaCutoffs > 0)
+		fprintf(stdout, "Beta-cutoff rate: %.4f\n", (float) stats.instCutoffs / stats.betaCutoffs);
+	
 	fprintf(stdout, "TT hits: %d\n\n", stats.ttHits);
 	fflush(stdout);
 	#endif
@@ -91,23 +101,23 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	if (settings.stop)
 		return 0;
 
-	if (settings.movetime && (stats.nodes & 4095) == 0 && clock() - start > settings.movetime) {
+	if (settings.movetime && stats.nodes % 4096 == 0 && clock() - start > settings.movetime) {
 		settings.stop = 1;
 		return 0;
 	}
 
 	const int incheck = inCheck(board);
 
-	if (incheck) 			// Check extensions
+	if (incheck) 			// 1. Check extensions
 		++depth;
-	else if (depth == 0) 	// Quiescence search
+	else if (depth == 0) 	// 2. Quiescence search
 		return qsearch(board, alpha, beta);
 
 	++stats.nodes;
 
 	const int index = board->key % settings.tt_entries;
 
-	// Transposition Table
+	// 3. Transposition Table
 	if (tt[index].key == board->key && tt[index].depth == depth) {
 		
 		#ifdef DEBUG
@@ -134,35 +144,34 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	const int staticEval = eval(board);
 	const int pvNode = beta - alpha > 1;
 	const int endgame = isEndgame(board);
+	const int safe = !incheck && !endgame;
+	const int verySafe = safe && !nullmove;
 
-	// Razoring
-	if (depth == 1 && !incheck && !endgame && staticEval + pieceValues[ROOK] < alpha)
+	// 4. Razoring
+	if (depth == 1 && safe && staticEval + pieceValues[ROOK] < alpha)
 		return qsearch(board, alpha, beta);
 
-	if (!nullmove && !incheck && !endgame) {
+	// 5. Static null move pruning
+	if (depth <= 6 && staticEval - pieceValues[PAWN] * depth > beta)
+		return staticEval;
 
-		// Static null move pruning
-		if (depth <= 6 && staticEval - pieceValues[PAWN] * depth > beta)
-			return staticEval;
+	// 6. Null move pruning
+	if (depth > R && verySafe) {
+		makeNullMove(board, &history);
+		const int score = -pvSearch(board, depth - 1 - R, -beta, -beta + 1, 1);
+		undoNullMove(board, &history);
 
-		// Null move pruning
-		if (depth > R) {
-			makeNullMove(board, &history);
-			const int score = -pvSearch(board, depth - 1 - R, -beta, -beta + 1, 1);
-			undoNullMove(board, &history);
+		if (score >= beta)
+			return beta;
+	}
 
-			if (score >= beta)
-				return beta;
-		}
+	// 7. Reverse futility pruning
+	if (verySafe && beta <= MAX_SCORE) {
+		if (depth == 1 && staticEval - pieceValues[KNIGHT] >= beta) return beta;
+		if (depth == 2 && staticEval - pieceValues[ROOK]   >= beta) return beta;
 
-		// Reverse futility pruning
-		if (beta <= MAX_SCORE) {
-			if (depth == 1 && staticEval - pieceValues[KNIGHT] >= beta) return beta;
-			if (depth == 2 && staticEval - pieceValues[ROOK]   >= beta) return beta;
-
-			// Razoring tests where depth is decreased don't give any elo
-			if (depth == 3 && staticEval - pieceValues[QUEEN]  >= beta) return beta;
-		}
+		// Razoring tests where depth is decreased don't give any elo
+		if (depth == 3 && staticEval - pieceValues[QUEEN]  >= beta) return beta;
 	}
 
 	Move moves[MAX_MOVES];
@@ -177,47 +186,57 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	Move bestMove = moves[0];
 	int bestScore = -INFINITY;
 
-	const int origAlpha = alpha, origBeta = beta;
+	const int prevAlpha = alpha;
 	const int newDepth = depth - 1;
 
-	static const int futMargins[] = {0, 200, 300, 500};
-	const int futPrun = depth <= 3 && !incheck && staticEval + futMargins[depth] <= alpha;
+	static const int fMargins[] = {0, 200, 300, 500};
+	const int fPrunning = depth <= 3 && !incheck && staticEval + fMargins[depth] <= alpha;
 
 	for (int i = 0; i < nMoves; ++i) {
 
-		// Futility Pruning
-		if (futPrun && i != 0 && moves[i].type == QUIET && !moves[i].promotion)
+		// 8. Futility Pruning
+		if (fPrunning && i != 0 && moves[i].type == QUIET && !moves[i].promotion)
 			continue;
 
 		makeMove(board, &moves[i], &history);
 		updateBoardKey(board, &moves[i], &history);
+
+		// The board's key is saved to check for 3fold repetition
 		saveKeyToMemory(board->key);
 
 		int score;
 
-		if (isDraw(board)) {
+		if (isDraw(board))
 			score = 0;
-		} else if (i == 0) {
+		
+		else if (i == 0)
 			score = -pvSearch(board, newDepth, -beta, -alpha, nullmove);
-		} else {
+		
+		else {
 			int reduct = 0;
 
-			// Late move reduction
-			if (i > 4 && depth >= 3 && !incheck && moves[i].type == QUIET && !moves[i].promotion)
+			// 9. Late move reduction
+			// Only quiet moves (excluding promotions) are reduced
+			if (i > 4 && depth >= 3 && moves[i].score == 0 && !incheck)
 				++reduct;
 
-			// PV search
+			// 10. PV search
+			// A search with a small window is used to see 
+			// if the move is worth exploring further
 			score = -pvSearch(board, newDepth - reduct, -alpha-1, -alpha, nullmove);
 
+			// Research if the score is worth looking into
 			if (score > alpha && score < beta)
 				score = -pvSearch(board, newDepth, -beta, -alpha, nullmove);
 		}
 
+		// The board's key is freed from the 3fold repetition list
 		freeKeyFromMemory();
+
 		updateBoardKey(board, &moves[i], &history);
 		undoMove(board, &moves[i], &history);
 
-		// Updates the best value and prunes the tree when alpha >= beta
+		// Updates the best move
 		if (score > bestScore) {
 			bestScore = score;
 			bestMove = moves[i];
@@ -225,12 +244,12 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 			if (bestScore > alpha) {
 				alpha = bestScore;
 
+				// AlphaBeta prunning
 				if (alpha >= beta) {
 
-					if (moves[i].type == QUIET) {
-						// Killer moves are moves that produce a cutoff despite being quiet
+					// Killer moves are moves that produce a cutoff despite being quiet
+					if (moves[i].type == QUIET)
 						saveKillerMove(&moves[i], board->ply);
-					}
 
 					#ifdef DEBUG
 					++stats.betaCutoffs;
@@ -247,12 +266,12 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 
 	int flag = EXACT;
 
-	if (bestScore <= origAlpha) {
+	if (bestScore <= prevAlpha)
 		flag = UPPER_BOUND;
-	} else if (bestScore >= origBeta) {
+	else if (bestScore >= beta)
 		flag = LOWER_BOUND;
-	}
 
+	// Always replace the entry for the TT
 	tt[index] = compressEntry(board->key, &bestMove, bestScore, depth, flag);
 
 	return bestScore;
@@ -281,9 +300,15 @@ static int qsearch(Board *board, int alpha, int beta) {
 
 	sort(board, moves, nMoves);
 
+	/*
+	* 1. TT move
+	* 2. Good captures
+	* 3. Promotions
+	* 4. Equal captures
+	* 5. Killer moves
+	*/
 	for (int i = 0; i < nMoves; ++i) {
-		
-		// Prunes quiet moves (excluding promotions) and moves with negative SEE
+
 		if (moves[i].score < 40)
 			break;
 
