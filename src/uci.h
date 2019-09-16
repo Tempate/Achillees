@@ -5,7 +5,7 @@
 
 void uci(void);
 
-void infoString(const Board *board, PV *pv, const int score, const int depth, const long time, const uint64_t nodes);
+void infoString(const Board *board, const int depth, const int score, const uint64_t nodes, const int duration, Move *pv, const int nPV);
 
 void playMoves(Board *board, char *moves);
 

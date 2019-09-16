@@ -16,6 +16,7 @@
 static void isready(void);
 static void position(Board *board, char *s);
 static void go(Board *board, Settings *settings, char *s);
+static void setoption(Settings *settings, char *s);
 
 pthread_t worker;
 int working = 0;
@@ -24,6 +25,7 @@ void uci(void) {
 
 	fprintf(stdout, "id name %s\n", ENGINE_NAME);
 	fprintf(stdout, "id author %s\n", ENGINE_AUTHOR);
+	fprintf(stdout, "option name hash type spin default 128 min 1 max 2048\n");
 	fprintf(stdout, "uciok\n");
 	fflush(stdout);
 
@@ -44,6 +46,8 @@ void uci(void) {
 			evaluate(&board);
 		else if (strncmp(msg, "go", 2) == 0)
 			go(&board, &settings, msg + 2);
+		else if (strncmp(msg, "setoption name", 14) == 0)
+			setoption(&settings, msg + 15);
 		else if (strncmp(msg, "stop", 4) == 0) {
 			settings.stop = 1;
 
@@ -120,6 +124,15 @@ static void go(Board *board, Settings *settings, char *s) {
 	createSearchThread(board);
 }
 
+// Options are expected to be in the form:
+// <option> value <value>
+static void setoption(Settings *settings, char *s) {
+	printf("%s\n", s);
+
+	if (strncmp(s, "hash", 4) == 0)
+		resizeTT(atoi(s + 11));
+}
+
 void playMoves(Board *board, char *moves) {
 	char *rest, *moveText;
 	rest = moves;
@@ -148,14 +161,20 @@ void *bestmove(void *args) {
 	return NULL;
 }
 
-void infoString(const Board *board, PV *pv, const int score, const int depth, const long duration, const uint64_t nodes) {
-	const int relativeScore = (board->turn == WHITE) ? score : -score;
+void infoString(const Board *board, const int depth, const int score, const uint64_t nodes, const int duration, Move *pv, const int nPV) {
 
-	fprintf(stdout, "info score cp %d depth %d time %ld nps %ld nodes %ld pv ", relativeScore, depth, duration, 1000 * nodes / (duration+1), nodes);
+	fprintf(stdout, "info depth %d score cp %d nodes %ld time %d ", depth, score, nodes, duration);
 
-	for (int i = 0; i < pv->count; ++i) {
+	if (duration > 0) {
+		const int nps = 1000 * nodes / duration;
+		fprintf(stdout, "nps %d ", nps);
+	}
+
+	fprintf(stdout, "pv ");
+
+	for (int i = 0; i < nPV; ++i) {
 		char moveText[6];
-		moveToText(pv->moves[i], moveText);
+		moveToText(pv[i], moveText);
 		fprintf(stdout, "%s ", moveText);
 	}
 
