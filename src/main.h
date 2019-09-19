@@ -18,21 +18,6 @@
 
 // #define DEBUG
 
-#ifdef DEBUG
-    #define ASSERT(condition)\
-    {\
-        if (!(condition)) {\
-            printf("info string file: %d\n", __FILE__);\
-            printf("info string line: %d\n", __LINE__);\
-            printf("info string function: %s\n", __PRETTY_FUNCTION__);\
-            printf("info string condition: %s\n", #condition);\
-            abort();\
-        }\
-    }
-#else
-    #define ASSERT(condition)
-#endif
-
 extern uint64_t bitmask[64];
 extern uint64_t inBetweenLookup[64][64];
 
@@ -68,5 +53,20 @@ static inline int min(const int a, const int b) { return (a < b) ? a : b; }
 
 void defaultSettings(Settings *settings);
 void evaluate(const Board *board);
+
+#ifdef DEBUG
+    #define ASSERT(condition)\
+    {\
+        if (!(condition)) {\
+            printf("info string file: %d\n", __FILE__);\
+            printf("info string line: %d\n", __LINE__);\
+            printf("info string function: %s\n", __PRETTY_FUNCTION__);\
+            printf("info string condition: %s\n", #condition);\
+            abort();\
+        }\
+    }
+#else
+    #define ASSERT(condition)
+#endif
 
 #endif /* MAIN_H_ */
