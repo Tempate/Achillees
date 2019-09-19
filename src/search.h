@@ -5,7 +5,6 @@
 #define DEF_DEPTH 5
 
 #define INFINITY 2 * MAX_SCORE
-#define R 2
 
 enum {EXACT, UPPER_BOUND, LOWER_BOUND};
 

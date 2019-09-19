@@ -108,16 +108,16 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 
 	const int incheck = inCheck(board);
 
-	if (incheck) 			// 1. Check extensions
+	if (incheck) 			// Check extensions
 		++depth;
-	else if (depth == 0) 	// 2. Quiescence search
+	else if (depth <= 0) 	// Quiescence search
 		return qsearch(board, alpha, beta);
 
 	++stats.nodes;
 
 	const int index = board->key % settings.tt_entries;
 
-	// 3. Transposition Table
+	// Transposition Table
 	if (tt[index].key == board->key && tt[index].depth == depth) {
 		
 		#ifdef DEBUG
@@ -147,25 +147,27 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	const int safe = !incheck && !endgame;
 	const int verySafe = safe && !nullmove;
 
-	// 4. Razoring
+	// Razoring
 	if (depth == 1 && safe && staticEval + pieceValues[ROOK] < alpha)
 		return qsearch(board, alpha, beta);
 
-	// 5. Static null move pruning
+	// Static null move pruning
 	if (depth <= 6 && staticEval - pieceValues[PAWN] * depth > beta)
 		return staticEval;
 
-	// 6. Null move pruning
+	// Null move reduction
+	const int R = 2;
+
 	if (depth > R && verySafe) {
 		makeNullMove(board, &history);
-		const int score = -pvSearch(board, depth - 1 - R, -beta, -beta + 1, 1);
+		const int score = -pvSearch(board, depth - R - 1, -beta, -beta + 1, 1);
 		undoNullMove(board, &history);
 
 		if (score >= beta)
-			return beta;
+			return pvSearch(board, depth - R, alpha, beta, 0);
 	}
 
-	// 7. Reverse futility pruning
+	// Reverse futility pruning
 	if (verySafe && beta <= MAX_SCORE) {
 		if (depth == 1 && staticEval - pieceValues[KNIGHT] >= beta) return beta;
 		if (depth == 2 && staticEval - pieceValues[ROOK]   >= beta) return beta;
@@ -177,11 +179,15 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	Move moves[MAX_MOVES];
 	const int nMoves = legalMoves(board, moves);
 
-	// It's a leaf node, there are no legal moves
-	if (nMoves == 0)
+	switch (nMoves) {
+	case 0:
 		return finalEval(board, depth);
-
-	sort(board, moves, nMoves);
+	/* case 1:
+		depth++;
+		break; */
+	default:
+		sort(board, moves, nMoves);
+	}
 
 	Move bestMove = moves[0];
 	int bestScore = -INFINITY;
@@ -194,8 +200,15 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 
 	for (int i = 0; i < nMoves; ++i) {
 
-		// 8. Futility Pruning
-		if (fPrunning && i != 0 && moves[i].type == QUIET && !moves[i].promotion)
+		const int quietMove = moves[i].type == QUIET && !moves[i].promotion;
+
+		// Futility Pruning
+		if (i != 0 && fPrunning && quietMove)
+			continue;
+
+		// Late move pruning 
+		// Skip a move when it's score is bad and it has low depth
+		if (newDepth <= 6 && moves[i].score < -10 * depth * depth)
 			continue;
 
 		makeMove(board, &moves[i], &history);
@@ -215,18 +228,18 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 		else {
 			int reduct = 0;
 
-			// 9. Late move reduction
+			// Late move reduction
 			// Only quiet moves (excluding promotions) are reduced
-			if (i > 4 && depth >= 3 && moves[i].score == 0 && !incheck)
+			if (depth >= 2 && moves[i].score == 0 && !incheck)
 				++reduct;
 
-			// 10. PV search
+			// PV search
 			// A search with a small window is used to see 
 			// if the move is worth exploring further
 			score = -pvSearch(board, newDepth - reduct, -alpha-1, -alpha, nullmove);
 
 			// Research if the score is worth looking into
-			if (score > alpha && score < beta)
+			if (score > alpha)
 				score = -pvSearch(board, newDepth, -beta, -alpha, nullmove);
 		}
 
@@ -280,13 +293,20 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 static int qsearch(Board *board, int alpha, int beta) {
 	++stats.nodes;
 
-	const int standPat = eval(board);
+	int standPat = eval(board);
+
+	/*
+	if (inCheck(board))
+		standPat -= pieceValues[KNIGHT];
+	*/
 
 	if (standPat >= beta)
 		return beta;
 
 	// Delta pruning
-	if (standPat + pieceValues[QUEEN] < alpha && !isEndgame(board))
+	const int delta = pieceValues[QUEEN];
+
+	if (standPat + delta < alpha && !isEndgame(board))
 		return alpha;
 	
 	if (standPat > alpha)
@@ -318,8 +338,16 @@ static int qsearch(Board *board, int alpha, int beta) {
 		const int score = -qsearch(board, -beta, -alpha);
 		undoMove(board, &moves[i], &history);
 
-		if (score >= beta)
+		if (score >= beta) {
+			#ifdef DEBUG
+			++stats.betaCutoffs;
+
+			if (i == 0)
+				++stats.instCutoffs;
+			#endif
+
 			return beta;
+		}
 
 		if (score > alpha)
 			alpha = score;
