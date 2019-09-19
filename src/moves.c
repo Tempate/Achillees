@@ -135,7 +135,7 @@ static uint64_t checkingAttack(const Board *board) {
 	attacks |= checkingSliders;
 
 	if (checkingSliders) do {
-		const uint64_t attacker = bitScanForward(checkingSliders);
+		const int attacker = bitScanForward(checkingSliders);
 		attacks |= inBetweenLookup[kingIndex][attacker];
 	} while (unsetLSB(checkingSliders));
 
