@@ -27,6 +27,7 @@ You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
 - Check extensions
 - Late move reduction
 - Aspiration windows
+- Null window search
 
 - Pruning
   - Razoring
@@ -35,6 +36,7 @@ You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
   - Static null move pruning
   - Futility pruning
   - Reverse futility pruning
+  - Late move pruning
 
 ## Running the code
 
