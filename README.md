@@ -33,7 +33,6 @@ You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
   - Razoring
   - Delta pruning
   - Null move pruning
-  - Static null move pruning
   - Futility pruning
   - Reverse futility pruning
   - Late move pruning
