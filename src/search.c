@@ -151,14 +151,14 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	if (depth == 1 && safe && staticEval + pieceValues[ROOK] < alpha)
 		return qsearch(board, alpha, beta);
 
-	// Static null move pruning
-	if (depth <= 6 && staticEval - pieceValues[PAWN] * depth > beta)
+	// Reverse Futility Pruning
+	if (depth <= 4 && staticEval - pieceValues[PAWN] * depth > beta)
 		return staticEval;
 
 	// Null move reduction
-	const int R = 2;
+	if (verySafe) {
+		const int R = 3;
 
-	if (depth > R && verySafe) {
 		makeNullMove(board, &history);
 		const int score = -pvSearch(board, depth - R - 1, -beta, -beta + 1, 1);
 		undoNullMove(board, &history);
@@ -167,27 +167,13 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 			return pvSearch(board, depth - R, alpha, beta, 0);
 	}
 
-	// Reverse futility pruning
-	if (verySafe && beta <= MAX_SCORE) {
-		if (depth == 1 && staticEval - pieceValues[KNIGHT] >= beta) return beta;
-		if (depth == 2 && staticEval - pieceValues[ROOK]   >= beta) return beta;
-
-		// Razoring tests where depth is decreased don't give any elo
-		if (depth == 3 && staticEval - pieceValues[QUEEN]  >= beta) return beta;
-	}
-
 	Move moves[MAX_MOVES];
 	const int nMoves = legalMoves(board, moves);
 
-	switch (nMoves) {
-	case 0:
+	if (nMoves == 0)
 		return finalEval(board, depth);
-	/* case 1:
-		depth++;
-		break; */
-	default:
-		sort(board, moves, nMoves);
-	}
+
+	sort(board, moves, nMoves);
 
 	Move bestMove = moves[0];
 	int bestScore = -INFINITY;
