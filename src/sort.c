@@ -4,6 +4,7 @@
 #include "search.h"
 #include "hashtables.h"
 #include "sort.h"
+#include "draw.h"
 
 static int seePromotion(Board *board, const Move *move);
 
@@ -42,6 +43,25 @@ void sort(Board *board, Move *moves, const int nMoves) {
 			else if (compareMoves(&moves[i], &killerMoves[board->ply][1]))
 				moves[i].score = 45;
 		}
+	}
+
+	insertionSort(moves, nMoves);
+}
+
+void sortAB(Board *board, Move *moves, const int nMoves, const int depth, const int alpha, const int beta, const int nullmove) {
+
+	for (int i = 0; i < nMoves; ++i) {
+
+		History history;
+
+		makeMove(board, &moves[i], &history);
+
+		if (isDraw(board))
+			moves[i].score = 0;
+		else
+			moves[i].score = -pvSearch(board, depth, -beta, -alpha, nullmove);
+		
+		undoMove(board, &moves[i], &history);
 	}
 
 	insertionSort(moves, nMoves);
