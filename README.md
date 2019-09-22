@@ -28,6 +28,7 @@ You are also free to challenge it at [Lichess](https://lichess.org/@/Achillees).
 - Late move reduction
 - Aspiration windows
 - Null window search
+- Internal Iterative Deepening
 
 - Pruning
   - Razoring
