@@ -116,9 +116,10 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 	++stats.nodes;
 
 	const int index = board->key % settings.tt_entries;
+	const int ttHit = tt[index].key == board->key;
 
 	// Transposition Table
-	if (tt[index].key == board->key && tt[index].depth == depth) {
+	if (ttHit && tt[index].depth == depth) {
 		
 		#ifdef DEBUG
 		++stats.ttHits;
@@ -157,13 +158,14 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 
 	// Null move reduction
 	if (verySafe) {
-		const int R = 3;
+		static const int R = 3;
+		const int bound = beta;
 
 		makeNullMove(board, &history);
-		const int score = -pvSearch(board, depth - R - 1, -beta, -beta + 1, 1);
+		const int score = -pvSearch(board, depth - R - 1, -bound, -bound + 1, 1);
 		undoNullMove(board, &history);
 
-		if (score >= beta)
+		if (score >= bound)
 			return pvSearch(board, depth - R, alpha, beta, 0);
 	}
 
@@ -172,6 +174,13 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 
 	if (nMoves == 0)
 		return finalEval(board, depth);
+
+	// IID
+	if (!ttHit && depth >= 7 && pvNode) {
+		pvSearch(board, depth - 2, alpha, beta, nullmove);
+
+		ASSERT(tt[index].key == board->key);
+	}
 
 	sort(board, moves, nMoves);
 
@@ -306,6 +315,8 @@ static int qsearch(Board *board, int alpha, int beta) {
 
 	sort(board, moves, nMoves);
 
+	const int incheck = inCheck(board);
+
 	/*
 	* 1. TT move
 	* 2. Good captures
@@ -317,6 +328,11 @@ static int qsearch(Board *board, int alpha, int beta) {
 
 		if (moves[i].score < 40)
 			break;
+
+		// Futility pruning
+		if (moves[i].type == CAPTURE && standPat + moves[i].score < alpha && 
+			!incheck && !givesCheck(board, &moves[i]))
+			continue;
 
 		History history;
 
