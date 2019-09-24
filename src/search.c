@@ -198,7 +198,7 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 		const int quietMove = moves[i].type == QUIET && !moves[i].promotion;
 
 		// Futility Pruning
-		if (i != 0 && fPrunning && quietMove)
+		if (!pvNode && fPrunning && quietMove)
 			continue;
 
 		// Late move pruning 
@@ -288,12 +288,7 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 static int qsearch(Board *board, int alpha, int beta) {
 	++stats.nodes;
 
-	int standPat = eval(board);
-
-	/*
-	if (inCheck(board))
-		standPat -= pieceValues[KNIGHT];
-	*/
+	const int standPat = eval(board);
 
 	if (standPat >= beta)
 		return beta;
