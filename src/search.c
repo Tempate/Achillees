@@ -366,12 +366,16 @@ static void timeManagement(const Board *board) {
 			increment = settings.binc;
 		}
 
-		if (remaining || increment) {
-			const clock_t timeToMove = min(remaining >> 2, (remaining >> 5) + increment) - 20;
-			settings.movetime = (timeToMove * CLOCKS_PER_SEC) / 1000;
-		}
-	} else {
-		settings.movetime *= CLOCKS_PER_SEC / 1000;
+		if (settings.movestogo || increment) {
+			if (settings.movestogo && settings.movestogo < 8)
+				settings.movetime = min(remaining >> 1, remaining / (settings.movestogo + 12) + (clock_t)((double) increment * .4));
+			else
+				settings.movetime = min(remaining >> 2, remaining / 27 + (clock_t)((double)increment * .95));
+        } else {
+            settings.movetime = remaining / 41;
+        }
 	}
+
+	settings.movetime *= CLOCKS_PER_SEC / 1000;
 }
 
