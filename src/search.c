@@ -280,6 +280,11 @@ int pvSearch(Board *board, int depth, int alpha, int beta, const int nullmove) {
 		flag = LOWER_BOUND;
 
 	// Always replace the entry for the TT
+	// UNLESS the position currently in there has a different key and goes deeper
+	if (tt[index].key != board->key && tt[index].depth > depth) {
+		return bestScore;
+	}
+
 	tt[index] = compressEntry(board->key, &bestMove, bestScore, depth, flag);
 
 	return bestScore;
